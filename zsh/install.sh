@@ -244,18 +244,4 @@ if [ "$missing" -gt 0 ]; then
   warn "$missing item(s) unavailable. The .zshrc guards each one, so zsh still starts."
 fi
 
-repo_root=$(cd "$(dirname "$0")/.." && pwd)
-platform=$([ "$(uname -s)" = Darwin ] && echo darwin || echo linux)
-
-cat <<EOF
-
-Deps done. This script does not touch your dotfiles, so link them yourself:
-
-  ln -sfn "$repo_root/zsh/$platform/.zshrc" "\$HOME/.zshrc"
-  mkdir -p "\$HOME/.config/ohmyposh"
-  ln -sfn "$repo_root/oh-my-posh/theme.omp.json" "\$HOME/.config/ohmyposh/theme.omp.json"
-  mkdir -p "\$HOME/.ssh" && chmod 700 "\$HOME/.ssh"
-  ln -sfn "$repo_root/ssh/config" "\$HOME/.ssh/config"
-
-Then start a new shell with: exec zsh
-EOF
+log "Deps done. Start a new shell with: exec zsh"
