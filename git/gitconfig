@@ -1,0 +1,53 @@
+[user]
+	name = s
+	email = s@sauce2.com
+	signingkey = ~/.ssh/id_ed25519
+
+[core]
+	autocrlf = input
+	eol = lf
+	editor = nano
+	untrackedCache = true
+	longpaths = true
+
+[init]
+	defaultBranch = main
+
+[diff]
+	algorithm = histogram
+
+[merge]
+	ff = true
+	conflictstyle = zdiff3
+
+[rerere]
+	enabled = true
+
+[rebase]
+	autoStash = true
+
+[push]
+	autoSetupRemote = true
+
+[pull]
+	rebase = true
+	ff = true
+
+[fetch]
+	prune = true
+	pruneTags = true
+
+[commit]
+	gpgsign = true
+
+[tag]
+	gpgsign = true
+
+[gpg]
+	format = ssh
+
+[feature]
+	manyFiles = true
+
+[pack]
+	threads = 0
