@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json",
+  "version": 4,
+  "final_space": false,
+  "blocks": [
+    {
+      "type": "prompt",
+      "alignment": "left",
+      "newline": true,
+      "segments": [
+        {
+          "type": "text",
+          "style": "plain",
+          "foreground": "#98C379",
+          "foreground_templates": [
+            "{{ if gt .Code 0 }}#E06C75{{ end }}"
+          ],
+          "template": "\u256d\u2500 "
+        },
+        {
+  "type": "session",
+  "style": "plain",
+  "foreground": "#C678DD",
+  "template": "{{ .UserName }}@{{ .HostName }} "
+},
+        {
+          "type": "path",
+          "style": "plain",
+          "foreground": "#56B6C2",
+          "template": "{{ .Path }} ",
+          "options": {
+            "style": "folder"
+          }
+        },
+        {
+          "type": "git",
+          "style": "plain",
+          "foreground": "#D0666F",
+          "template": "<#D0666F>git:(</><#E5C07B>{{ .HEAD }}</>{{ if .BranchStatus }} <#61AFEF>{{ .BranchStatus }}</>{{ end }}{{ if or .Working.Changed .Staging.Changed }} <#E06C75>\u2717</>{{ end }}<#D0666F>)</> ",
+          "options": {
+            "branch_icon": "",
+            "fetch_status": true
+          }
+        }
+      ]
+    },
+    {
+      "type": "prompt",
+      "alignment": "right",
+      "segments": [
+        {
+          "type": "node",
+          "style": "plain",
+          "foreground": "#56B6C2",
+          "template": "node {{ .Full }} ",
+          "options": {
+            "display_mode": "files",
+            "fetch_version": true
+          }
+        },
+        {
+          "type": "pnpm",
+          "style": "plain",
+          "powerline_symbol": "\ue0b0",
+          "template": "pnpm v{{ .Full }} ",
+          "foreground": "#56B6C2"
+        },
+        {
+          "type": "react",
+          "style": "plain",
+          "powerline_symbol": "\ue0b0",
+          "template": "react {{ .Full }} ",
+          "foreground": "#56B6C2"
+        },
+        {
+          "type": "executiontime",
+          "style": "plain",
+          "foreground": "#98C379",
+          "template": "{{ .FormattedMs }} ",
+          "options": {
+            "threshold": 100
+          }
+        },
+        {
+          "type": "time",
+          "style": "plain",
+          "foreground": "#7F848E",
+          "template": "{{ .CurrentDate | date .Format }}"
+        }
+      ]
+    },
+    {
+      "type": "prompt",
+      "alignment": "left",
+      "newline": true,
+      "segments": [
+        {
+          "type": "text",
+          "style": "plain",
+          "foreground": "#98C379",
+          "foreground_templates": [
+            "{{ if gt .Code 0 }}#E06C75{{ end }}"
+          ],
+          "template": "\u2570\u2500 "
+        }
+      ]
+    }
+  ]
+}
