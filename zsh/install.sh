@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Installs everything the .zshrc files in this directory expect to find.
-# Run this after zsh itself is installed. Safe to re-run.
+# Run this after zsh itself is installed. Safe to re-run. Does not touch
+# your dotfiles.
 #
 #   ./install.sh            install
 #   ./install.sh --dry-run  print the commands instead of running them
@@ -161,10 +162,10 @@ for entry in $packages; do
     warn "$PM has no '$(pkg_name "$PM" "$pkg")'; install it yourself if you want it"
 done
 
-log "Installing the command-not-found handler"
-if [ "$PM" = brew ]; then
-  run brew tap homebrew/command-not-found
-else
+# Homebrew merged this into brew itself. Tapping the old repo is now a hard
+# error ("this tap is now empty") and would abort the rest of this script.
+if [ "$PM" != brew ]; then
+  log "Installing the command-not-found handler"
   install_pkg command-not-found ||
     warn "no command-not-found backend for $PM; the plugin will stay quiet"
 fi
@@ -244,4 +245,4 @@ if [ "$missing" -gt 0 ]; then
   warn "$missing item(s) unavailable. The .zshrc guards each one, so zsh still starts."
 fi
 
-log "Deps done. Start a new shell with: exec zsh"
+log "Done."
