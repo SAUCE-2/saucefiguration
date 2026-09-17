@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Installs everything the .zshrc files in this directory expect to find.
 # Run this after zsh itself is installed. Safe to re-run. Does not touch
-# your dotfiles.
+# your dotfiles. Stamps this clone's HEAD so the next shell can notice
+# new commits and offer to re-run (see check-update.sh).
 #
 #   ./install.sh            install
 #   ./install.sh --dry-run  print the commands instead of running them
@@ -115,6 +116,23 @@ find_plugin() {
     fi
   done
   return 1
+}
+
+# Stamp this clone so a later shell can notice new commits (see check-update.sh).
+# SAUCE_ROOT / SAUCE_STATE_DIR are for tests; live runs use this script's path.
+record_install_rev() {
+  local root sha state
+  root=${SAUCE_ROOT:-$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)} || return 0
+  sha=$(git -C "$root" rev-parse HEAD 2>/dev/null) || return 0
+  state="${SAUCE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/saucefiguration}"
+  if [ "${DRY_RUN:-0}" = 1 ]; then
+    printf '   would record %s in %s\n' "$sha" "$state"
+    return 0
+  fi
+  mkdir -p "$state"
+  printf '%s\n' "$root" >"$state/repo"
+  printf '%s\n' "$sha" >"$state/sha"
+  rm -f "$state/snooze"
 }
 
 # install.test.sh sources this file for the functions above and nothing else.
@@ -262,4 +280,5 @@ if [ "$missing" -gt 0 ]; then
   warn "$missing item(s) unavailable. The .zshrc guards each one, so zsh still starts."
 fi
 
+record_install_rev
 log "Done."

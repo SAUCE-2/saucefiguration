@@ -116,7 +116,19 @@ if [ -f "$HOMEBREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ]; 
   source "$HOMEBREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
 fi
 
-# Keep this last: syntax highlighting must load after all other shell setup.
+# Keep this last among plugins: syntax highlighting must load after other shell setup.
 if [ -f "$HOMEBREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]; then
   source "$HOMEBREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+fi
+
+# Same idea as omz's update prompt: if install.sh recorded this clone and it
+# has moved, list the commits (configs you may want to copy again) and offer
+# to re-run the installer. No-op until that stamp exists.
+if [[ -o interactive && -t 1 && -z ${SAUCE_DISABLE_UPDATE_CHECK:-} ]]; then
+  _sauce_state="${XDG_STATE_HOME:-$HOME/.local/state}/saucefiguration"
+  if [[ -f $_sauce_state/repo ]]; then
+    _sauce_root=$(tr -d '\r\n' <"$_sauce_state/repo")
+    [[ -f $_sauce_root/zsh/check-update.sh ]] && bash "$_sauce_root/zsh/check-update.sh"
+  fi
+  unset _sauce_state _sauce_root
 fi

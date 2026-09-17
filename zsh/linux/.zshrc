@@ -141,7 +141,19 @@ _source_zsh_plugin() {
 # Inline grey history suggestions. Accept with Right Arrow.
 _source_zsh_plugin zsh-autosuggestions
 
-# Keep this last: syntax highlighting must load after all other shell setup.
+# Keep this last among plugins: syntax highlighting must load after other shell setup.
 _source_zsh_plugin zsh-syntax-highlighting
 
 unset -f _source_zsh_plugin
+
+# Same idea as omz's update prompt: if install.sh recorded this clone and it
+# has moved, list the commits (configs you may want to copy again) and offer
+# to re-run the installer. No-op until that stamp exists.
+if [[ -o interactive && -t 1 && -z ${SAUCE_DISABLE_UPDATE_CHECK:-} ]]; then
+  _sauce_state="${XDG_STATE_HOME:-$HOME/.local/state}/saucefiguration"
+  if [[ -f $_sauce_state/repo ]]; then
+    _sauce_root=$(tr -d '\r\n' <"$_sauce_state/repo")
+    [[ -f $_sauce_root/zsh/check-update.sh ]] && bash "$_sauce_root/zsh/check-update.sh"
+  fi
+  unset _sauce_state _sauce_root
+fi
