@@ -67,6 +67,9 @@ if (( $+commands[fnm] )); then
   eval "$(fnm env --use-on-cd --shell zsh)"
 fi
 
+# Vite+ (vp): toolchain plus node/npm/pnpm shims. After fnm so the shims win.
+[ -f "$HOME/.config/vite-plus/env" ] && . "$HOME/.config/vite-plus/env"
+
 # Better directory jumping: `z partial-directory-name`.
 if (( $+commands[zoxide] )); then
   eval "$(zoxide init zsh)"

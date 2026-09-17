@@ -209,11 +209,28 @@ else
   run bash -c 'curl -fsSL https://ohmyposh.dev/install.sh | bash -s'
 fi
 
+# Vite+ is not in distro repos. CI=true is silent/--yes; VP_NODE_MANAGER=yes
+# skips the Node-manager prompt. The .zshrc sources ~/.config/vite-plus/env.
+if have vp || [ -x "$HOME/.local/share/vite-plus/bin/vp" ]; then
+  log "Vite+ already installed"
+else
+  log "Installing Vite+"
+  if [ "$PM" = apk ]; then
+    install_pkg libstdc++ || warn "no libstdc++; Vite+'s managed Node needs it"
+  fi
+  run bash -c 'curl -fsSL https://vite.plus | CI=true VP_NODE_MANAGER=yes bash'
+fi
+
+if [ -f "$HOME/.config/vite-plus/env" ]; then
+  # shellcheck disable=SC1091
+  . "$HOME/.config/vite-plus/env"
+fi
+
 log "Verifying what the shell config will find"
 missing=0
-# zsh is a prerequisite rather than a package here. fnm and oh-my-posh are
-# installed by vendor scripts above; ssh-agent ships with OpenSSH.
-for tool in zsh fnm oh-my-posh ssh-agent ssh-add; do
+# zsh is a prerequisite rather than a package here. fnm, oh-my-posh and Vite+
+# are installed by vendor scripts above; ssh-agent ships with OpenSSH.
+for tool in zsh fnm oh-my-posh vp ssh-agent ssh-add; do
   check "$tool" "$tool" || missing=$((missing + 1))
 done
 
