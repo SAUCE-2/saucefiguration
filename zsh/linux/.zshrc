@@ -126,11 +126,11 @@ if (( $+commands[oh-my-posh] )) && [ -f "$POSH_THEME" ]; then
   )"
 fi
 
-# Debian and Fedora put these under /usr/share, Arch and Alpine under
-# /usr/share/zsh/plugins, so try each location and source the first hit.
+# ~/.local/share is the immutable-root fallback from install.sh. Debian and
+# Fedora put these under /usr/share, Arch and Alpine under /usr/share/zsh/plugins.
 _source_zsh_plugin() {
   local dir
-  for dir in /usr/share /usr/share/zsh/plugins /usr/local/share; do
+  for dir in "$HOME/.local/share" /usr/share /usr/share/zsh/plugins /usr/local/share; do
     if [ -f "$dir/$1/$1.zsh" ]; then
       source "$dir/$1/$1.zsh"
       return
