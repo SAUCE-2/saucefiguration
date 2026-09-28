@@ -119,8 +119,8 @@ if [ -f "$HOMEBREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.
 fi
 
 # Same idea as omz's update prompt: if install.sh recorded this clone and it
-# has moved, list the commits and offer to re-run the installer (which
-# copies the updated configs). No-op until that stamp exists.
+# has moved, the first prompt asks Y/n whether to update. Re-running the
+# installer copies the updated configs. No-op until that stamp exists.
 if [[ -o interactive && -t 1 && -z ${SAUCE_DISABLE_UPDATE_CHECK:-} ]]; then
   _sauce_state="${XDG_STATE_HOME:-$HOME/.local/state}/saucefiguration"
   if [[ -f $_sauce_state/repo ]]; then

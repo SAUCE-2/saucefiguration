@@ -3,7 +3,7 @@
 # Run this after zsh itself is installed. Safe to re-run. Copies this
 # clone's configs into $HOME and warns when it replaces a file that
 # already exists. Stamps this clone's HEAD so the next shell can notice
-# new commits and offer to re-run (see check-update.sh).
+# new commits and offer to update (see check-update.sh).
 #
 #   ./install.sh            install
 #   ./install.sh --dry-run  print the commands instead of running them
@@ -304,7 +304,7 @@ install_dotfiles() {
   copy_file "$root/ssh/allowed_signers" "$HOME/.ssh/allowed_signers"
 }
 
-# Stamp this clone so a later shell can notice new commits (see check-update.sh).
+# Stamp this clone so a later shell can offer to update (see check-update.sh).
 # SAUCE_ROOT / SAUCE_STATE_DIR are for tests; live runs use this script's path.
 record_install_rev() {
   local root sha state
