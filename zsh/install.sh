@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Installs everything the .zshrc files in this directory expect to find.
-# Run this after zsh itself is installed. Safe to re-run. Does not touch
-# your dotfiles. Stamps this clone's HEAD so the next shell can notice
+# Run this after zsh itself is installed. Safe to re-run. Copies this
+# clone's configs into $HOME and warns when it replaces a file that
+# already exists. Stamps this clone's HEAD so the next shell can notice
 # new commits and offer to re-run (see check-update.sh).
 #
 #   ./install.sh            install
@@ -244,6 +245,65 @@ install_user() {
   esac
 }
 
+# Copy $1 onto $2. Identical dest is a no-op. Anything else already there
+# is overwritten after a warning. $3 is an optional chmod mode.
+copy_file() {
+  local src=$1 dest=$2 mode=${3:-}
+  if [ ! -f "$src" ]; then
+    warn "missing $src"
+    return 1
+  fi
+
+  if [ -L "$dest" ] || [ -f "$dest" ]; then
+    if cmp -s "$src" "$dest"; then
+      return 0
+    fi
+    printf '\033[1;33mwarn:\033[0m replacing %s\n' "$dest" >&2
+  elif [ -e "$dest" ]; then
+    warn "not a file: $dest"
+    return 1
+  fi
+
+  if [ "${DRY_RUN:-0}" = 1 ]; then
+    printf '   would copy %s -> %s\n' "$src" "$dest"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$dest")"
+  # A dest symlink would make cp write through it; drop it first.
+  if [ -L "$dest" ]; then
+    rm -f "$dest"
+  fi
+  cp "$src" "$dest"
+  if [ -n "$mode" ]; then
+    chmod "$mode" "$dest"
+  fi
+}
+
+# Repo configs -> the paths the shell, git and ssh already look at.
+# SAUCE_ROOT is for tests; live runs use this script's path.
+install_dotfiles() {
+  local root platform
+  root=${SAUCE_ROOT:-$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)} || return 1
+  case "$(uname -s)" in
+    Darwin) platform=darwin ;;
+    *) platform=linux ;;
+  esac
+
+  log "Copying config files"
+  copy_file "$root/zsh/$platform/.zshrc" "$HOME/.zshrc"
+  copy_file "$root/git/.gitconfig" "$HOME/.gitconfig"
+  copy_file "$root/ohmyposh/theme.omp.json" "$HOME/.config/ohmyposh/theme.omp.json"
+
+  if [ "${DRY_RUN:-0}" != 1 ]; then
+    mkdir -p "$HOME/.ssh"
+    chmod 700 "$HOME/.ssh"
+  fi
+  copy_file "$root/ssh/config" "$HOME/.ssh/config" 600
+  copy_file "$root/ssh/authorized_keys" "$HOME/.ssh/authorized_keys" 600
+  copy_file "$root/ssh/allowed_signers" "$HOME/.ssh/allowed_signers"
+}
+
 # Stamp this clone so a later shell can notice new commits (see check-update.sh).
 # SAUCE_ROOT / SAUCE_STATE_DIR are for tests; live runs use this script's path.
 record_install_rev() {
@@ -347,8 +407,8 @@ if [ -d "$HOME/.oh-my-zsh" ]; then
   log "Oh My Zsh already installed"
 else
   log "Installing Oh My Zsh"
-  # KEEP_ZSHRC stops the installer replacing the .zshrc from this repo, CHSH
-  # leaves the login shell alone, RUNZSH keeps this script going.
+  # KEEP_ZSHRC stops omz writing a default .zshrc; we copy this repo's one
+  # later. CHSH leaves the login shell alone, RUNZSH keeps this script going.
   run bash -c 'RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"'
 fi
 
@@ -424,5 +484,6 @@ if [ "$missing" -gt 0 ]; then
   warn "$missing item(s) unavailable. The .zshrc guards each one, so zsh still starts."
 fi
 
+install_dotfiles
 record_install_rev
 log "Done."
