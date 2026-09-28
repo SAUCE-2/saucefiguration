@@ -138,6 +138,7 @@ home="$work/home"
 mkdir -p "$tree/zsh/linux" "$tree/git" "$tree/ohmyposh" "$tree/ssh"
 printf 'zshrc\n' >"$tree/zsh/linux/.zshrc"
 printf 'gitconfig\n' >"$tree/git/.gitconfig"
+printf 'ignore\n' >"$tree/git/.gitignore_global"
 printf 'omp\n' >"$tree/ohmyposh/theme.omp.json"
 printf 'sshconfig\n' >"$tree/ssh/config"
 printf 'keys\n' >"$tree/ssh/authorized_keys"
@@ -156,6 +157,10 @@ printf '%s\n' "$err" | grep -q "replacing $home/.zshrc" || {
 }
 [ "$(cat "$home/.gitconfig")" = gitconfig ] || {
   echo 'install_dotfiles missed .gitconfig' >&2
+  exit 1
+}
+[ "$(cat "$home/.gitignore_global")" = ignore ] || {
+  echo 'install_dotfiles missed .gitignore_global' >&2
   exit 1
 }
 [ "$(cat "$home/.config/ohmyposh/theme.omp.json")" = omp ] || {
@@ -182,5 +187,41 @@ printf '%s\n' "$err" | grep -q "replacing $home/.zshrc" || {
   echo "ssh config mode: $(stat -c %a "$home/.ssh/config")" >&2
   exit 1
 }
+
+# Real clone: every file in git/, ssh/, ohmyposh/ must land in $HOME.
+# zsh/ is only the platform .zshrc; install.sh and tests stay in the clone.
+real_root=$(CDPATH= cd -- "$script_dir/.." && pwd)
+real_home="$work/realhome"
+mkdir -p "$real_home"
+HOME="$real_home" SAUCE_ROOT="$real_root" install_dotfiles >/dev/null
+case "$(uname -s)" in
+  Darwin) platform=darwin ;;
+  *) platform=linux ;;
+esac
+cmp -s "$real_root/zsh/$platform/.zshrc" "$real_home/.zshrc" || {
+  echo "install_dotfiles missed real zsh/$platform/.zshrc" >&2
+  exit 1
+}
+for src in "$real_root/git"/* "$real_root/git"/.[!.]*; do
+  [ -f "$src" ] || continue
+  cmp -s "$src" "$real_home/$(basename "$src")" || {
+    echo "install_dotfiles missed real git/$(basename "$src")" >&2
+    exit 1
+  }
+done
+for src in "$real_root/ohmyposh"/* "$real_root/ohmyposh"/.[!.]*; do
+  [ -f "$src" ] || continue
+  cmp -s "$src" "$real_home/.config/ohmyposh/$(basename "$src")" || {
+    echo "install_dotfiles missed real ohmyposh/$(basename "$src")" >&2
+    exit 1
+  }
+done
+for src in "$real_root/ssh"/* "$real_root/ssh"/.[!.]*; do
+  [ -f "$src" ] || continue
+  cmp -s "$src" "$real_home/.ssh/$(basename "$src")" || {
+    echo "install_dotfiles missed real ssh/$(basename "$src")" >&2
+    exit 1
+  }
+done
 
 echo ok
