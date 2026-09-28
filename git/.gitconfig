@@ -9,6 +9,7 @@
 	editor = nano
 	untrackedCache = true
 	longpaths = true
+	excludesFile = ~/.gitignore_global
 
 [init]
 	defaultBranch = main
