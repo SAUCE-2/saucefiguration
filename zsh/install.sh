@@ -292,16 +292,30 @@ install_dotfiles() {
 
   log "Copying config files"
   copy_file "$root/zsh/$platform/.zshrc" "$HOME/.zshrc"
-  copy_file "$root/git/.gitconfig" "$HOME/.gitconfig"
-  copy_file "$root/ohmyposh/theme.omp.json" "$HOME/.config/ohmyposh/theme.omp.json"
+
+  # These dirs map 1:1 onto a dest dir. Copy every file so a new one cannot
+  # sit in the clone unused (.[!.]* covers .gitconfig / .gitignore_global).
+  for src in "$root/git"/* "$root/git"/.[!.]*; do
+    [ -f "$src" ] || continue
+    copy_file "$src" "$HOME/$(basename "$src")"
+  done
+  for src in "$root/ohmyposh"/* "$root/ohmyposh"/.[!.]*; do
+    [ -f "$src" ] || continue
+    copy_file "$src" "$HOME/.config/ohmyposh/$(basename "$src")"
+  done
 
   if [ "${DRY_RUN:-0}" != 1 ]; then
     mkdir -p "$HOME/.ssh"
     chmod 700 "$HOME/.ssh"
   fi
-  copy_file "$root/ssh/config" "$HOME/.ssh/config" 600
-  copy_file "$root/ssh/authorized_keys" "$HOME/.ssh/authorized_keys" 600
-  copy_file "$root/ssh/allowed_signers" "$HOME/.ssh/allowed_signers"
+  for src in "$root/ssh"/* "$root/ssh"/.[!.]*; do
+    [ -f "$src" ] || continue
+    name=$(basename "$src")
+    case "$name" in
+      config | authorized_keys) copy_file "$src" "$HOME/.ssh/$name" 600 ;;
+      *) copy_file "$src" "$HOME/.ssh/$name" ;;
+    esac
+  done
 }
 
 # Stamp this clone so a later shell can offer to update (see check-update.sh).
