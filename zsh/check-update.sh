@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Oh My Zsh-style notice for this clone. .zshrc runs it on interactive start.
 # Compares HEAD / upstream to the rev install.sh recorded and, if they differ,
-# lists the commits (and files) so you know which configs to copy again.
+# lists the commits (and files) the installer will copy on re-run.
 #
 #   SAUCE_DISABLE_UPDATE_CHECK=1   skip
 #   SAUCE_STATE_DIR                override the state directory (tests)
@@ -66,7 +66,7 @@ fi
 count=$(git_c rev-list --count $ranges 2>/dev/null) || count=0
 [ "$count" -gt 0 ] || exit 0
 
-msg "$count new commit(s) since last install. Re-run the installer, then copy any configs you still want:"
+msg "$count new commit(s) since last install. Re-run the installer to copy them:"
 echo
 # shellcheck disable=SC2086
 git_c log -15 --format='  %h %s' $ranges
@@ -84,7 +84,7 @@ files=$(
   } | sort -u
 )
 if [ -n "$files" ]; then
-  printf '  files (copy again if you use them):\n'
+  printf '  files the installer will copy:\n'
   printf '%s\n' "$files" | sed 's/^/    /'
   echo
 fi
