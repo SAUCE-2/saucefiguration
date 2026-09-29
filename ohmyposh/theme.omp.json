@@ -1,109 +1,75 @@
 {
   "$schema": "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json",
   "version": 4,
-  "final_space": false,
+  "final_space": true,
+  "patch_pwsh_bleed": true,
   "blocks": [
     {
       "type": "prompt",
       "alignment": "left",
-      "newline": true,
       "segments": [
         {
-          "type": "text",
+          "type": "os",
           "style": "plain",
-          "foreground": "#98C379",
-          "foreground_templates": [
-            "{{ if gt .Code 0 }}#E06C75{{ end }}"
-          ],
-          "template": "\u256d\u2500 "
+          "foreground": "p:muted-foreground",
+          "template": "{{ .Icon }} "
         },
         {
-  "type": "session",
-  "style": "plain",
-  "foreground": "#C678DD",
-  "template": "{{ .UserName }}@{{ .HostName }} "
-},
+          "type": "session",
+          "style": "plain",
+          "foreground": "p:secondary",
+          "template": "{{ .UserName }}@{{ .HostName }} "
+        },
         {
           "type": "path",
           "style": "plain",
-          "foreground": "#56B6C2",
+          "foreground": "p:primary",
           "template": "{{ .Path }} ",
           "options": {
-            "style": "folder"
+            "folder_icon": "..\ue5fe..",
+            "home_icon": "~",
+            "style": "agnoster_short"
           }
         },
         {
           "type": "git",
           "style": "plain",
-          "foreground": "#D0666F",
-          "template": "<#D0666F>git:(</><#E5C07B>{{ .HEAD }}</>{{ if .BranchStatus }} <#61AFEF>{{ .BranchStatus }}</>{{ end }}{{ if or .Working.Changed .Staging.Changed }} <#E06C75>\u2717</>{{ end }}<#D0666F>)</> ",
-          "options": {
-            "branch_icon": "",
-            "fetch_status": true
-          }
+          "foreground": "p:git",
+          "template": "{{ .HEAD }}{{ if .BranchStatus }} {{ .BranchStatus }}{{ end }}{{ if or .Working.Changed .Staging.Changed }} <p:destructive>\u2717</>{{ end }} "
+        },
+        {
+          "type": "text",
+          "style": "plain",
+          "foreground": "p:closer",
+          "template": "\uf105"
         }
       ]
     },
     {
-      "type": "prompt",
+      "type": "rprompt",
       "alignment": "right",
       "segments": [
         {
-          "type": "node",
-          "style": "plain",
-          "foreground": "#56B6C2",
-          "template": "node {{ .Full }} ",
-          "options": {
-            "display_mode": "files",
-            "fetch_version": true
-          }
-        },
-        {
-          "type": "pnpm",
-          "style": "plain",
-          "powerline_symbol": "\ue0b0",
-          "template": "pnpm v{{ .Full }} ",
-          "foreground": "#56B6C2"
-        },
-        {
-          "type": "react",
-          "style": "plain",
-          "powerline_symbol": "\ue0b0",
-          "template": "react {{ .Full }} ",
-          "foreground": "#56B6C2"
-        },
-        {
           "type": "executiontime",
           "style": "plain",
-          "foreground": "#98C379",
-          "template": "{{ .FormattedMs }} ",
-          "options": {
-            "threshold": 100
-          }
+          "foreground": "p:muted-foreground",
+          "template": " \uf252 {{ .FormattedMs }} "
         },
         {
           "type": "time",
           "style": "plain",
-          "foreground": "#7F848E",
-          "template": "{{ .CurrentDate | date .Format }}"
-        }
-      ]
-    },
-    {
-      "type": "prompt",
-      "alignment": "left",
-      "newline": true,
-      "segments": [
-        {
-          "type": "text",
-          "style": "plain",
-          "foreground": "#98C379",
-          "foreground_templates": [
-            "{{ if gt .Code 0 }}#E06C75{{ end }}"
-          ],
-          "template": "\u2570\u2500 "
+          "foreground": "p:muted-foreground",
+          "template": " \uf017 {{ .CurrentDate | date .Format }} "
         }
       ]
     }
-  ]
+  ],
+  "palette": {
+    "primary": "#6633ff",
+    "secondary": "#0091c8",
+    "git": "#9678f0",
+    "destructive": "#fa788c",
+    "muted-foreground": "#69697d",
+    "closer": "#85859f"
+  }
 }
