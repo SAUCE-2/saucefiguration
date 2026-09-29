@@ -67,6 +67,9 @@ if (( $+commands[fnm] )); then
   eval "$(fnm env --use-on-cd --shell zsh)"
 fi
 
+# Cloudflare CLI completion, written by install.sh. Tab still runs `cf`.
+[ -f "$HOME/.config/cf/complete.zsh" ] && . "$HOME/.config/cf/complete.zsh"
+
 # Better directory jumping: `z partial-directory-name`.
 if (( $+commands[zoxide] )); then
   eval "$(zoxide init zsh)"

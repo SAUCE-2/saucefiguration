@@ -462,11 +462,46 @@ else
   run bash -c 'curl -fsSL https://ohmyposh.dev/install.sh | bash -s'
 fi
 
+# Cloudflare CLI (`cf`), now in beta. Not in distro repos; the npm package
+# needs Node.js 22.18+.
+# https://developers.cloudflare.com/changelog/post/2026-09-28-cloudflare-cli-beta/
+# npm's global bin is not always on PATH yet (fnm).
+if have npm; then
+  npm_prefix=$(npm prefix -g 2>/dev/null) || npm_prefix=
+  if [ -n "${npm_prefix}" ] && [ -d "${npm_prefix}/bin" ]; then
+    export PATH="${npm_prefix}/bin:${PATH}"
+  fi
+fi
+
+if have cf; then
+  log "Cloudflare CLI already installed"
+elif have npm; then
+  log "Installing Cloudflare CLI"
+  run npm install --global cf || warn "npm could not install cf (needs Node 22.18+)"
+else
+  warn "no npm; Cloudflare CLI needs Node 22.18+ (npm install --global cf)"
+fi
+
+# Completion bootstrap only. Tab still shells out to `cf` later. The .zshrc
+# sources this file; this script does not edit dotfiles.
+if have cf; then
+  if [ "${DRY_RUN:-0}" = 1 ]; then
+    printf '   would write cf completion to %s\n' "$HOME/.config/cf/complete.zsh"
+  else
+    log "Writing Cloudflare CLI zsh completion"
+    mkdir -p "$HOME/.config/cf"
+    if ! cf complete zsh >"$HOME/.config/cf/complete.zsh"; then
+      rm -f "$HOME/.config/cf/complete.zsh"
+      warn "could not write cf zsh completion"
+    fi
+  fi
+fi
+
 log "Verifying what the shell config will find"
 missing=0
-# zsh is a prerequisite rather than a package here. fnm and oh-my-posh
-# are installed by vendor scripts above; ssh-agent ships with OpenSSH.
-for tool in zsh fnm oh-my-posh ssh-agent ssh-add; do
+# zsh is a prerequisite rather than a package here. fnm, oh-my-posh and cf
+# are installed above; ssh-agent ships with OpenSSH.
+for tool in zsh fnm oh-my-posh cf ssh-agent ssh-add; do
   check "$tool" "$tool" || missing=$((missing + 1))
 done
 
