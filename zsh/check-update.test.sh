@@ -5,6 +5,13 @@
 set -euo pipefail
 
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+
+# Darwin still ships bash 3.2; ;& / ;;& are bash 4+.
+if grep -nE ';;?&' "$root/zsh/check-update.sh"; then
+  printf 'bash 4+ case fallthrough is not portable to macOS /bin/bash\n' >&2
+  exit 1
+fi
+
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 

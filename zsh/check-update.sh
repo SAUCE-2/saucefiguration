@@ -122,7 +122,7 @@ if [ "$count" -gt 0 ]; then
   msg "$count new commit(s) since last install. Re-run the installer to copy them:"
   echo
   # shellcheck disable=SC2086
-  git_c log -15 --format='  %h %s' $ranges
+  git_c --no-pager log -15 --format='  %h %s' $ranges
   if [ "$count" -gt 15 ]; then
     printf '  ... and %s more\n' $((count - 15))
   fi
@@ -130,12 +130,12 @@ if [ "$count" -gt 0 ]; then
 
   files=$(
     {
-      git_c diff --name-only "$last_sha" HEAD
+      git_c --no-pager diff --name-only "$last_sha" HEAD
       if git_c rev-parse @{u} >/dev/null 2>&1; then
-        git_c diff --name-only "$last_sha" @{u}
+        git_c --no-pager diff --name-only "$last_sha" @{u}
       fi
       if [ ${#remote_sha} -eq 40 ] && git_c cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
-        git_c diff --name-only "$last_sha" "$remote_sha"
+        git_c --no-pager diff --name-only "$last_sha" "$remote_sha"
       fi
     } | sort -u
   )
@@ -179,8 +179,10 @@ case "$option" in
     bash "$repo/zsh/install.sh"
     ;;
   n | N)
+    # Duplicate the default message: bash 3.2 (macOS) has no case fallthrough.
     echo $((now + 86400)) >"$state/snooze"
-    ;&
+    msg "You can update manually by running \`$repo/zsh/install.sh\`"
+    ;;
   *)
     msg "You can update manually by running \`$repo/zsh/install.sh\`"
     ;;
