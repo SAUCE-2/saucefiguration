@@ -3,6 +3,7 @@
   "version": 4,
   "final_space": true,
   "patch_pwsh_bleed": true,
+  "async": false,
   "blocks": [
     {
       "type": "prompt",
@@ -66,9 +67,9 @@
   ],
   "palette": {
     "primary": "#6633ff",
-    "secondary": "#0091c8",
-    "git": "#9678f0",
-    "destructive": "#fa788c",
+    "secondary": "#7774ce",
+    "git": "#a4a6e7",
+    "destructive": "#f7768e",
     "muted-foreground": "#69697d",
     "closer": "#85859f"
   }
