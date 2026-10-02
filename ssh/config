@@ -6,3 +6,6 @@ Host *
   UseKeychain yes
   ServerAliveInterval 30
   ServerAliveCountMax 3
+
+Host steampc
+  SetEnv TERM=xterm-256color
