@@ -77,6 +77,8 @@ pkg_name() {
     pacman:command-not-found) echo pkgfile ;;
     dnf:openssh-client) echo openssh-clients ;;
     pacman:openssh-client | zypper:openssh-client) echo openssh ;;
+    apt-get:go) echo golang-go ;;
+    dnf:go) echo golang ;;
     *) echo "$2" ;;
   esac
 }
@@ -497,11 +499,53 @@ if have cf; then
   fi
 fi
 
+# Boot.dev CLI. Needs a recent Go toolchain; lands in ~/go/bin (on PATH above).
+# https://github.com/bootdotdev/bootdev
+export PATH="$HOME/go/bin:$PATH"
+if have bootdev; then
+  log "Boot.dev CLI already installed"
+else
+  if ! have go; then
+    if [ "$PM" = brew ]; then
+      log "Installing Go (needed for Boot.dev CLI)"
+      install_pkg go || warn "brew could not install go"
+    elif [ "$PM_WRITE" = 1 ]; then
+      log "Installing Go (needed for Boot.dev CLI)"
+      install_pkg go || warn "$PM has no '$(pkg_name "$PM" go)'; install Go yourself for bootdev"
+    else
+      warn "no go and package db is read-only; install Go yourself for bootdev"
+    fi
+  fi
+  if have go; then
+    log "Installing Boot.dev CLI"
+    run go install github.com/bootdotdev/bootdev@latest ||
+      warn "go install bootdev failed"
+  fi
+fi
+
+# Tailscale. Official Linux installer picks the right package repo; Homebrew
+# prefers the Mac app cask (CLI included) and falls back to the formula.
+# Does not run `tailscale up` — auth stays interactive.
+if have tailscale; then
+  log "Tailscale already installed"
+elif [ "$PM" = brew ]; then
+  log "Installing Tailscale"
+  run brew install --cask tailscale ||
+    run brew install tailscale ||
+    warn "brew could not install Tailscale"
+elif [ "$PM_WRITE" = 1 ]; then
+  log "Installing Tailscale"
+  run bash -c 'curl -fsSL https://tailscale.com/install.sh | sh' ||
+    warn "Tailscale install script failed"
+else
+  warn "package db is read-only; install Tailscale yourself if you want it"
+fi
+
 log "Verifying what the shell config will find"
 missing=0
-# zsh is a prerequisite rather than a package here. fnm, oh-my-posh and cf
-# are installed above; ssh-agent ships with OpenSSH.
-for tool in zsh fnm oh-my-posh cf ssh-agent ssh-add; do
+# zsh is a prerequisite rather than a package here. Vendor CLIs above;
+# ssh-agent ships with OpenSSH.
+for tool in zsh fnm oh-my-posh cf bootdev tailscale ssh-agent ssh-add; do
   check "$tool" "$tool" || missing=$((missing + 1))
 done
 

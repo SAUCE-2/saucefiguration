@@ -14,6 +14,14 @@ SAUCE_LIB_ONLY=1 . "$script_dir/install.sh"
   echo 'pkg_name apt-get fd' >&2
   exit 1
 }
+[ "$(pkg_name apt-get go)" = golang-go ] || {
+  echo 'pkg_name apt-get go' >&2
+  exit 1
+}
+[ "$(pkg_name dnf go)" = golang ] || {
+  echo 'pkg_name dnf go' >&2
+  exit 1
+}
 [ "$(pkg_name pacman eza)" = eza ] || {
   echo 'pkg_name passthrough' >&2
   exit 1
