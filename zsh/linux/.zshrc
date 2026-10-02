@@ -2,8 +2,8 @@
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME=""
 
-# User-installed tools, including Oh My Posh.
-export PATH="$HOME/.local/bin:$PATH"
+# User-installed tools, including Oh My Posh and `go install` binaries.
+export PATH="$HOME/.local/bin:$HOME/go/bin:$PATH"
 
 # Prevent duplicate PATH and completion entries.
 typeset -U path fpath
@@ -107,10 +107,6 @@ fi
 
 (( $+commands[rg] )) && alias grep='rg'
 (( $+commands[lazygit] )) && alias lg='lazygit'
-
-# Generated for envman. Do not edit.
-[ -s "$HOME/.config/envman/load.sh" ] \
-  && source "$HOME/.config/envman/load.sh"
 
 # Bootdev submit.
 alias bdev='yes | bootdev run -s'
