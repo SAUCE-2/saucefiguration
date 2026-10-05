@@ -52,7 +52,8 @@ zstyle :omz:plugins:ssh-agent ssh-add-args --apple-use-keychain --apple-load-key
 
 source "$ZSH/oh-my-zsh.sh"
 
-# macOS uses Ctrl+S as XOFF, which freezes the terminal. Turn that off.
+# macOS uses Ctrl+S as XOFF, which freezes the terminal. Turn that off
+# so GNU nano receives it as Save. Apple's /usr/bin/nano is Pico and ignores it.
 stty -ixon
 
 # Persistent shell history.

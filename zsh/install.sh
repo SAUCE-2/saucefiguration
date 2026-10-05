@@ -541,6 +541,18 @@ else
   warn "package db is read-only; install Tailscale yourself if you want it"
 fi
 
+# Apple's /usr/bin/nano is Pico: save is Ctrl+O, and it cannot be rebound.
+# GNU nano (Homebrew) saves with Ctrl+S once XOFF is off. `command -v nano`
+# hits Pico, so that check cannot decide this.
+if [ "$PM" = brew ] && [ "$PM_WRITE" = 1 ]; then
+  if [ -x /opt/homebrew/bin/nano ] || [ -x /usr/local/bin/nano ]; then
+    log "GNU nano already installed"
+  else
+    log "Installing GNU nano"
+    install_pkg nano || warn "brew could not install nano; Ctrl+S save needs it"
+  fi
+fi
+
 log "Verifying what the shell config will find"
 missing=0
 # zsh is a prerequisite rather than a package here. Vendor CLIs above;
