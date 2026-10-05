@@ -52,6 +52,9 @@ zstyle :omz:plugins:ssh-agent ssh-add-args --apple-use-keychain --apple-load-key
 
 source "$ZSH/oh-my-zsh.sh"
 
+# macOS uses Ctrl+S as XOFF, which freezes the terminal. Turn that off.
+stty -ixon
+
 # Persistent shell history.
 HISTFILE="$HOME/.zsh_history"
 HISTSIZE=100000
