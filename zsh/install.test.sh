@@ -73,6 +73,36 @@ printf '%s\n' "$out" | grep -q 'would install eza into ~/.local' || {
   exit 1
 }
 
+out=$(PATH=/usr/bin:/bin DRY_RUN=1 install_webi dotenv-linter)
+printf '%s\n' "$out" | grep -q 'https://webi.sh/dotenv-linter@stable' || {
+  printf 'install_webi dry-run missed the webinstall URL\n%s\n' "$out" >&2
+  exit 1
+}
+mkdir -p "$work/bin"
+printf '#!/bin/sh\necho dotenv-linter 1\n' >"$work/bin/dotenv-linter"
+chmod +x "$work/bin/dotenv-linter"
+out=$(PATH="$work/bin:/usr/bin:/bin" DRY_RUN=1 install_webi dotenv-linter)
+printf '%s\n' "$out" | grep -q 'dotenv-linter already installed' || {
+  printf 'install_webi should skip an existing binary\n%s\n' "$out" >&2
+  exit 1
+}
+
+weh="$work/weh"
+mkdir -p "$weh"
+printf 'keep\n' >"$weh/.bashrc"
+HOME="$weh" webi_rc_snapshot
+printf '\nenvman\n' >>"$weh/.bashrc"
+printf 'created\n' >"$weh/.zshrc"
+HOME="$weh" webi_rc_restore
+[ "$(cat "$weh/.bashrc")" = 'keep' ] || {
+  echo 'webi_rc_restore did not put .bashrc back' >&2
+  exit 1
+}
+[ ! -e "$weh/.zshrc" ] || {
+  echo 'webi_rc_restore left a .zshrc webi created' >&2
+  exit 1
+}
+
 src="$work/src.txt"
 dest="$work/dest.txt"
 printf 'new\n' >"$src"
