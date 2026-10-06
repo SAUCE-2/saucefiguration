@@ -337,6 +337,69 @@ record_install_rev() {
   rm -f "$state/snooze"
 }
 
+# webinstall.dev package whose binary name matches the package name.
+# Lands in ~/.local/bin, which both .zshrc files already put on PATH.
+# https://webinstall.dev/dotenv
+# https://webinstall.dev/dotenv-linter
+#
+# webi appends `source ~/.config/envman/load.sh` to shell rc files it finds.
+# This repo dropped envman; put those files back. ponytail: a symlink rc is
+# restored as a symlink, so an append that followed the link stays in the
+# target. Upgrade: snapshot the target's bytes too.
+webi_rcs() {
+  printf '%s\n' \
+    "$HOME/.profile" \
+    "$HOME/.bashrc" \
+    "$HOME/.zshrc" \
+    "$HOME/.config/fish/config.fish"
+}
+
+webi_rc_snapshot() {
+  local rc n=0
+  _webi_snap=$(mktemp -d)
+  while IFS= read -r rc; do
+    n=$((n + 1))
+    if [ -e "$rc" ] || [ -L "$rc" ]; then
+      cp -a "$rc" "$_webi_snap/$n.file"
+    else
+      : >"$_webi_snap/$n.absent"
+    fi
+  done < <(webi_rcs)
+}
+
+webi_rc_restore() {
+  local rc n=0
+  [ -n "${_webi_snap:-}" ] && [ -d "$_webi_snap" ] || return 0
+  while IFS= read -r rc; do
+    n=$((n + 1))
+    if [ -f "$_webi_snap/$n.absent" ]; then
+      rm -f "$rc"
+    elif [ -e "$_webi_snap/$n.file" ] || [ -L "$_webi_snap/$n.file" ]; then
+      rm -f "$rc"
+      cp -a "$_webi_snap/$n.file" "$rc"
+    fi
+  done < <(webi_rcs)
+  rm -rf "$_webi_snap"
+  unset _webi_snap
+}
+
+install_webi() {
+  local pkg=$1
+  if have "$pkg"; then
+    log "$pkg already installed"
+    return 0
+  fi
+  log "Installing $pkg"
+  if [ "${DRY_RUN:-0}" = 1 ]; then
+    run bash -c "curl -fsSL https://webi.sh/${pkg}@stable | sh"
+    return 0
+  fi
+  webi_rc_snapshot
+  bash -c "curl -fsSL https://webi.sh/${pkg}@stable | sh" ||
+    warn "could not install $pkg"
+  webi_rc_restore
+}
+
 # install.test.sh sources this file for the functions above and nothing else.
 if [ "${SAUCE_LIB_ONLY:-0}" = 1 ]; then
   return 0
@@ -541,6 +604,13 @@ else
   warn "package db is read-only; install Tailscale yourself if you want it"
 fi
 
+# dotenv runs a command with a .env loaded. dotenv-linter checks .env files.
+# https://webinstall.dev/dotenv
+# https://webinstall.dev/dotenv-linter
+for pkg in dotenv dotenv-linter; do
+  install_webi "$pkg"
+done
+
 # Apple's /usr/bin/nano is Pico: save is Ctrl+O, and it cannot be rebound.
 # GNU nano (Homebrew) saves with Ctrl+S once XOFF is off. `command -v nano`
 # hits Pico, so that check cannot decide this.
@@ -557,7 +627,7 @@ log "Verifying what the shell config will find"
 missing=0
 # zsh is a prerequisite rather than a package here. Vendor CLIs above;
 # ssh-agent ships with OpenSSH.
-for tool in zsh fnm oh-my-posh cf bootdev tailscale ssh-agent ssh-add; do
+for tool in zsh fnm oh-my-posh cf bootdev tailscale dotenv dotenv-linter ssh-agent ssh-add; do
   check "$tool" "$tool" || missing=$((missing + 1))
 done
 
