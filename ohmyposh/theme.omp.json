@@ -4,6 +4,12 @@
   "final_space": true,
   "patch_pwsh_bleed": true,
   "async": false,
+  "upgrade": {
+    "auto": false,
+    "notice": false,
+    "interval": "168h",
+    "source": "github"
+  },
   "blocks": [
     {
       "type": "prompt",
