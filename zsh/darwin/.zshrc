@@ -124,7 +124,8 @@ fi
 # Same idea as omz's update prompt: if install.sh recorded this clone and it
 # has moved, the first prompt asks Y/n whether to update. Re-running the
 # installer copies the updated configs. No-op until that stamp exists.
-if [[ -o interactive && -t 1 && -z ${SAUCE_DISABLE_UPDATE_CHECK:-} ]]; then
+# Skipped under `zsh -i -c` (IDE environment readers): nobody can answer.
+if [[ -o interactive && -t 1 && -z ${ZSH_EXECUTION_STRING:-} && -z ${SAUCE_DISABLE_UPDATE_CHECK:-} ]]; then
   _sauce_state="${XDG_STATE_HOME:-$HOME/.local/state}/saucefiguration"
   if [[ -f $_sauce_state/repo ]]; then
     _sauce_root=$(tr -d '\r\n' <"$_sauce_state/repo")
