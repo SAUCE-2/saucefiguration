@@ -34,10 +34,12 @@ plugins=(
 zstyle ':omz:plugins:alias-finder' autoload yes
 zstyle ':omz:plugins:alias-finder' cheaper yes
 
-# Start one ssh-agent for the session and load id_ed25519 so git only
-# asks for the passphrase once.
+# Start one ssh-agent for the session. Lazy: don't ssh-add at shell start,
+# because tools like IntelliJ run `zsh -l -i -c ...` with no terminal and the
+# passphrase prompt hangs them. AddKeysToAgent in ~/.ssh/config loads the key
+# on first use, so git still only asks for the passphrase once.
 # These zstyles must be set before oh-my-zsh.sh sources the plugin.
-zstyle :omz:plugins:ssh-agent identities id_ed25519
+zstyle :omz:plugins:ssh-agent lazy yes
 zstyle :omz:plugins:ssh-agent quiet yes
 
 source "$ZSH/oh-my-zsh.sh"
