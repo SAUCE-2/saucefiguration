@@ -272,14 +272,15 @@ copy_file() {
   fi
 
   mkdir -p "$(dirname "$dest")"
-  # A dest symlink would make cp write through it; drop it first.
-  if [ -L "$dest" ]; then
-    rm -f "$dest"
-  fi
-  cp "$src" "$dest"
+  # Write a temp file and rename it over dest. Rewriting dest in place would
+  # corrupt a shell still reading it: the update check runs this from inside
+  # ~/.zshrc. Renaming also replaces a dest symlink instead of writing through.
+  local tmp="$dest.tmp.$$"
+  cp "$src" "$tmp" || return 1
   if [ -n "$mode" ]; then
-    chmod "$mode" "$dest"
+    chmod "$mode" "$tmp"
   fi
+  mv -f "$tmp" "$dest"
 }
 
 # Repo configs -> the paths the shell, git and ssh already look at.

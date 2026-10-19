@@ -131,6 +131,17 @@ printf '%s\n' "$err" | grep -q "replacing $dest" || {
   exit 1
 }
 
+# A shell sourcing ~/.zshrc runs the update, which copies a new .zshrc while
+# zsh is still reading the old one. Replace the file, don't rewrite it in place.
+printf 'old\n' >"$dest"
+exec 3<"$dest"
+copy_file "$src" "$dest" 2>/dev/null
+[ "$(cat <&3)" = old ] || {
+  echo 'copy_file rewrote dest in place under an open reader' >&2
+  exit 1
+}
+exec 3<&-
+
 printf 'old\n' >"$dest"
 err=$(DRY_RUN=1 copy_file "$src" "$dest" 2>&1) || true
 printf '%s\n' "$err" | grep -q "replacing $dest" || {
