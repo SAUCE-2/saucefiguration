@@ -53,6 +53,18 @@ zstyle :omz:plugins:ssh-agent quiet yes
 
 source "$ZSH/oh-my-zsh.sh"
 
+# git signs commits with ssh-keygen, which never adds the key to the agent, so
+# AddKeysToAgent doesn't help there: every commit would ask for the passphrase.
+# Load the key on the first git command in a terminal instead. The -t check
+# keeps IntelliJ's `zsh -l -i -c ...` from hanging on the prompt.
+git() {
+  if [[ -t 0 ]]; then
+    ssh-add -l >/dev/null 2>&1
+    (( $? == 1 )) && ssh-add --apple-use-keychain -q
+  fi
+  command git "$@"
+}
+
 # macOS uses Ctrl+S as XOFF, which freezes the terminal. Turn that off
 # so GNU nano receives it as Save. Apple's /usr/bin/nano is Pico and ignores it.
 stty -ixon
