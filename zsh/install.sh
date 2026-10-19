@@ -518,6 +518,20 @@ else
   run bash -c 'curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell'
 fi
 
+# fnm brings no Node of its own. Take the newest LTS (a re-run picks up a
+# newer one) and make it the default, so npm exists below and in new shells.
+export PATH="$HOME/.local/share/fnm:$PATH"
+if have fnm; then
+  log "Installing the latest Node.js LTS"
+  run fnm install --lts || warn "fnm could not install the Node.js LTS"
+  run fnm default lts-latest || warn "fnm could not make the LTS its default"
+  if [ "${DRY_RUN:-0}" != 1 ]; then
+    eval "$(fnm env --shell bash)"
+  fi
+else
+  warn "no fnm; install Node.js yourself"
+fi
+
 if have oh-my-posh; then
   log "Oh My Posh already installed"
 elif [ "$PM" = brew ]; then
@@ -529,7 +543,7 @@ else
 fi
 
 # Cloudflare CLI (`cf`), now in beta. Not in distro repos; the npm package
-# needs Node.js 22.18+.
+# needs Node.js 22.18+ (the LTS above is newer).
 # https://developers.cloudflare.com/changelog/post/2026-09-28-cloudflare-cli-beta/
 # npm's global bin is not always on PATH yet (fnm).
 if have npm; then
@@ -628,7 +642,7 @@ log "Verifying what the shell config will find"
 missing=0
 # zsh is a prerequisite rather than a package here. Vendor CLIs above;
 # ssh-agent ships with OpenSSH.
-for tool in zsh fnm oh-my-posh cf bootdev tailscale dotenv dotenv-linter ssh-agent ssh-add; do
+for tool in zsh fnm node oh-my-posh cf bootdev tailscale dotenv dotenv-linter ssh-agent ssh-add; do
   check "$tool" "$tool" || missing=$((missing + 1))
 done
 
