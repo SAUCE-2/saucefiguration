@@ -2,9 +2,12 @@
 # Self-check for install.sh helpers. Sources the function half only.
 set -euo pipefail
 
-script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+script_dir=$(CDPATH='' cd -- "$(dirname "$0")" && pwd)
 # shellcheck source=install.sh
 SAUCE_LIB_ONLY=1 . "$script_dir/install.sh"
+
+# Octal permission bits, e.g. 600. GNU stat takes -c, BSD (macOS) stat -f.
+file_mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
 
 [ "$(pkg_name pacman openssh-client)" = openssh ] || {
   echo 'pkg_name pacman openssh-client' >&2
@@ -119,6 +122,10 @@ err=$(copy_file "$src" "$dest" 2>&1 >/dev/null) || true
   printf 'identical dest should be silent\n%s\n' "$err" >&2
   exit 1
 }
+ls "$dest".bak.* >/dev/null 2>&1 && {
+  echo 'identical dest should not leave a backup' >&2
+  exit 1
+}
 
 printf 'old\n' >"$dest"
 err=$(copy_file "$src" "$dest" 2>&1 >/dev/null) || true
@@ -128,6 +135,19 @@ printf '%s\n' "$err" | grep -q "replacing $dest" || {
 }
 [ "$(cat "$dest")" = new ] || {
   echo 'copy_file did not replace dest' >&2
+  exit 1
+}
+# The old dest is kept next to it, and the warning says where.
+backup=$(printf '%s\n' "$err" | sed -n 's/.*(backup: \(.*\))$/\1/p')
+case "$backup" in
+  "$dest".bak.[0-9]*) ;;
+  *)
+    printf 'warning should name a %s.bak.<time> backup\n%s\n' "$dest" "$err" >&2
+    exit 1
+    ;;
+esac
+[ "$(cat "$backup")" = old ] || {
+  echo 'backup does not hold the old dest' >&2
   exit 1
 }
 
@@ -143,6 +163,7 @@ copy_file "$src" "$dest" 2>/dev/null
 exec 3<&-
 
 printf 'old\n' >"$dest"
+rm -f "$dest".bak.*
 err=$(DRY_RUN=1 copy_file "$src" "$dest" 2>&1) || true
 printf '%s\n' "$err" | grep -q "replacing $dest" || {
   printf 'dry-run missing replacement warning\n%s\n' "$err" >&2
@@ -154,6 +175,10 @@ printf '%s\n' "$err" | grep -q "would copy $src -> $dest" || {
 }
 [ "$(cat "$dest")" = old ] || {
   echo 'dry-run replaced dest' >&2
+  exit 1
+}
+ls "$dest".bak.* >/dev/null 2>&1 && {
+  echo 'dry-run left a backup' >&2
   exit 1
 }
 
@@ -176,16 +201,17 @@ copy_file "$src" "$work/link.txt" 2>/dev/null
 
 mode_dest="$work/mode.txt"
 copy_file "$src" "$mode_dest" 600
-[ "$(stat -c %a "$mode_dest")" = 600 ] || {
-  echo "copy_file mode: $(stat -c %a "$mode_dest")" >&2
+[ "$(file_mode "$mode_dest")" = 600 ] || {
+  echo "copy_file mode: $(file_mode "$mode_dest")" >&2
   exit 1
 }
 
 # Full set of repo configs into a fake $HOME.
 tree="$work/repo"
 home="$work/home"
-mkdir -p "$tree/zsh/linux" "$tree/tmux" "$tree/git" "$tree/ohmyposh" "$tree/ssh"
+mkdir -p "$tree/zsh/linux" "$tree/zsh/darwin" "$tree/tmux" "$tree/git" "$tree/ohmyposh" "$tree/ssh"
 printf 'zshrc\n' >"$tree/zsh/linux/.zshrc"
+printf 'zshrc\n' >"$tree/zsh/darwin/.zshrc"
 printf 'tmux\n' >"$tree/tmux/.tmux.conf"
 printf 'gitconfig\n' >"$tree/git/.gitconfig"
 printf 'ignore\n' >"$tree/git/.gitignore_global"
@@ -233,18 +259,65 @@ printf '%s\n' "$err" | grep -q "replacing $home/.zshrc" || {
   echo 'install_dotfiles missed allowed_signers' >&2
   exit 1
 }
-[ "$(stat -c %a "$home/.ssh")" = 700 ] || {
-  echo "ssh dir mode: $(stat -c %a "$home/.ssh")" >&2
+[ "$(file_mode "$home/.ssh")" = 700 ] || {
+  echo "ssh dir mode: $(file_mode "$home/.ssh")" >&2
   exit 1
 }
-[ "$(stat -c %a "$home/.ssh/config")" = 600 ] || {
-  echo "ssh config mode: $(stat -c %a "$home/.ssh/config")" >&2
+[ "$(file_mode "$home/.ssh/config")" = 600 ] || {
+  echo "ssh config mode: $(file_mode "$home/.ssh/config")" >&2
+  exit 1
+}
+
+# authorized_keys on a server: keys only it has survive, after the repo's.
+# The repo's line for a key replaces an old one with another comment.
+aktree="$work/aktree"
+cp -R "$tree" "$aktree"
+printf '%s\n' \
+  'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIrepo1 s@desktop' \
+  'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIrepo2 s@macbook' >"$aktree/ssh/authorized_keys"
+akh="$work/akhome"
+mkdir -p "$akh/.ssh"
+printf '%s\n' \
+  'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIrepo1 old-comment' \
+  '' \
+  'from="10.0.0.0/8",no-pty ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIserver deploy@ci' >"$akh/.ssh/authorized_keys"
+chmod 600 "$akh/.ssh/authorized_keys"
+old_keys=$(cat "$akh/.ssh/authorized_keys")
+HOME="$akh" SAUCE_ROOT="$aktree" install_dotfiles >/dev/null 2>&1 || true
+want=$(printf '%s\n' \
+  'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIrepo1 s@desktop' \
+  'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIrepo2 s@macbook' \
+  'from="10.0.0.0/8",no-pty ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIserver deploy@ci')
+[ "$(cat "$akh/.ssh/authorized_keys")" = "$want" ] || {
+  printf 'authorized_keys merge\n%s\n' "$(cat "$akh/.ssh/authorized_keys")" >&2
+  exit 1
+}
+ak_backup=$(ls "$akh/.ssh"/authorized_keys.bak.*) || {
+  echo 'replaced authorized_keys has no backup' >&2
+  exit 1
+}
+[ "$(cat "$ak_backup")" = "$old_keys" ] || {
+  echo 'authorized_keys backup does not hold the old file' >&2
+  exit 1
+}
+# find -perm, not stat: GNU and BSD (macOS) stat take different flags.
+for f in "$ak_backup" "$akh/.ssh/authorized_keys"; do
+  [ -n "$(find "$f" -perm 600)" ] || {
+    echo 'authorized_keys mode is not 600:' >&2
+    ls -l "$f" >&2
+    exit 1
+  }
+done
+# Re-run: the merge is stable, so nothing is replaced or backed up again.
+err=$(HOME="$akh" SAUCE_ROOT="$aktree" install_dotfiles 2>&1 >/dev/null) || true
+printf '%s\n' "$err" | grep -q 'replacing' && {
+  printf 're-run should replace nothing\n%s\n' "$err" >&2
   exit 1
 }
 
 # Real clone: every file in git/, ssh/, ohmyposh/ must land in $HOME.
 # zsh/ is only the platform .zshrc; install.sh and tests stay in the clone.
-real_root=$(CDPATH= cd -- "$script_dir/.." && pwd)
+real_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
 real_home="$work/realhome"
 mkdir -p "$real_home"
 HOME="$real_home" SAUCE_ROOT="$real_root" install_dotfiles >/dev/null

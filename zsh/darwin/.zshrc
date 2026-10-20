@@ -69,7 +69,10 @@ git() {
 
 # macOS uses Ctrl+S as XOFF, which freezes the terminal. Turn that off
 # so GNU nano receives it as Save. Apple's /usr/bin/nano is Pico and ignores it.
-stty -ixon
+# Terminal only: under IntelliJ's `zsh -l -i -c ...` stty has none and errors.
+if [[ -t 0 ]]; then
+  stty -ixon
+fi
 
 # Persistent shell history.
 HISTFILE="$HOME/.zsh_history"
