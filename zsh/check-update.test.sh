@@ -129,4 +129,39 @@ out=$(SAUCE_STATE_DIR="$state" bash "$root/zsh/check-update.sh" || true)
   exit 1
 }
 
+# The clone is also where the repo gets edited, and install.sh copies the
+# working tree. Y must not install uncommitted work, nor snooze the update.
+# Untracked files only count in a dir install.sh copies whole ($state is not).
+rm -f "$state/snooze" "$state/installed"
+for dirty in unstaged staged untracked; do
+  case "$dirty" in
+    unstaged) printf 'half done\n' >>"$work/zsh/linux/.zshrc" ;;
+    staged)
+      printf 'half done\n' >>"$work/zsh/linux/.zshrc"
+      git -C "$work" add zsh/linux/.zshrc
+      ;;
+    untracked) mkdir -p "$work/ssh" && printf 'Host draft\n' >"$work/ssh/config" ;;
+  esac
+  out=$(SAUCE_UPDATE_ANSWER=y SAUCE_STATE_DIR="$state" bash "$root/zsh/check-update.sh" || true)
+  [ ! -f "$state/installed" ] || {
+    printf 'Y installed %s changes\n%s\n' "$dirty" "$out" >&2
+    exit 1
+  }
+  printf '%s\n' "$out" | grep -q 'uncommitted changes' || {
+    printf 'no uncommitted-changes notice for %s changes\n%s\n' "$dirty" "$out" >&2
+    exit 1
+  }
+  [ ! -f "$state/snooze" ] || {
+    printf '%s changes snoozed the update\n%s\n' "$dirty" "$out" >&2
+    exit 1
+  }
+  git -C "$work" reset -q --hard
+  rm -rf "$work/ssh"
+done
+out=$(SAUCE_UPDATE_ANSWER=y SAUCE_STATE_DIR="$state" bash "$root/zsh/check-update.sh" || true)
+[ -f "$state/installed" ] || {
+  printf 'Y did not install once the tree was clean again\n%s\n' "$out" >&2
+  exit 1
+}
+
 echo ok

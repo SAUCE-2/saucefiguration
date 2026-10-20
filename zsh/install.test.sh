@@ -218,8 +218,9 @@ copy_file "$src" "$mode_dest" 600
 # Full set of repo configs into a fake $HOME.
 tree="$work/repo"
 home="$work/home"
-mkdir -p "$tree/zsh/linux" "$tree/tmux" "$tree/git" "$tree/ohmyposh" "$tree/ssh"
+mkdir -p "$tree/zsh/linux" "$tree/zsh/darwin" "$tree/tmux" "$tree/git" "$tree/ohmyposh" "$tree/ssh"
 printf 'zshrc\n' >"$tree/zsh/linux/.zshrc"
+printf 'zshrc\n' >"$tree/zsh/darwin/.zshrc"
 printf 'tmux\n' >"$tree/tmux/.tmux.conf"
 printf 'gitconfig\n' >"$tree/git/.gitconfig"
 printf 'ignore\n' >"$tree/git/.gitignore_global"
@@ -308,10 +309,11 @@ ak_backup=$(ls "$akh/.ssh"/authorized_keys.bak.*) || {
   echo 'authorized_keys backup does not hold the old file' >&2
   exit 1
 }
-# ls -l, not stat: GNU and BSD (macOS) stat take different flags.
+# find -perm, not stat: GNU and BSD (macOS) stat take different flags.
 for f in "$ak_backup" "$akh/.ssh/authorized_keys"; do
-  [ "$(ls -l "$f" | cut -c2-10)" = rw------- ] || {
-    echo "authorized_keys mode: $(ls -l "$f")" >&2
+  [ -n "$(find "$f" -perm 600)" ] || {
+    echo 'authorized_keys mode is not 600:' >&2
+    ls -l "$f" >&2
     exit 1
   }
 done
@@ -361,5 +363,54 @@ for src in "$real_root/ssh"/* "$real_root/ssh"/.[!.]*; do
     exit 1
   }
 done
+
+# Whole run on a Linux box with no sudo rights and every installer script
+# failing. PATH holds only these stubs and basic tools, so nothing real runs.
+# Configs must still land and the rev be stamped, or the update prompt asks
+# again in every new shell.
+stubs="$work/stubs"
+mkdir -p "$stubs"
+for cmd in bash sh tr mktemp tar find mkdir mv chmod rm cp cmp dirname basename awk date; do
+  ln -s "$(command -v "$cmd")" "$stubs/$cmd"
+done
+cat >"$stubs/uname" <<'EOF'
+#!/bin/sh
+case "$1" in -m) echo x86_64 ;; *) echo Linux ;; esac
+EOF
+printf '%s\n' '#!/bin/sh' 'echo 1000' >"$stubs/id"
+printf '%s\n' '#!/bin/sh' 'echo "sudo: a password is required" >&2' 'exit 1' >"$stubs/sudo"
+printf '%s\n' '#!/bin/sh' 'exit 100' >"$stubs/apt-get"
+# A script that fails, for the installers piped from curl into a shell.
+printf '%s\n' '#!/bin/sh' 'echo "exit 7"' 'exit 22' >"$stubs/curl"
+printf '%s\n' '#!/bin/sh' 'case "$*" in *rev-parse*) echo 1111111111111111111111111111111111111111 ;; *) exit 128 ;; esac' >"$stubs/git"
+# Only the scripts: chmod follows the symlinks above to the real tools, which
+# a non-root user (CI) may not change.
+chmod +x "$stubs/uname" "$stubs/id" "$stubs/sudo" "$stubs/apt-get" "$stubs/curl" "$stubs/git"
+fail_home="$work/failhome"
+mkdir -p "$fail_home"
+status=0
+out=$(env -i HOME="$fail_home" PATH="$stubs" SAUCE_ROOT="$tree" SAUCE_STATE_DIR="$work/failstate" \
+  "$BASH" "$script_dir/install.sh" 2>&1) || status=$?
+[ "$status" = 1 ] || {
+  printf 'failed install should exit 1, got %s\n%s\n' "$status" "$out" >&2
+  exit 1
+}
+[ "$(cat "$fail_home/.zshrc" 2>/dev/null)" = zshrc ] || {
+  printf 'failed install skipped the configs\n%s\n' "$out" >&2
+  exit 1
+}
+[ "$(cat "$work/failstate/sha" 2>/dev/null)" = 1111111111111111111111111111111111111111 ] || {
+  printf 'failed install did not stamp the rev\n%s\n' "$out" >&2
+  exit 1
+}
+printf '%s\n' "$out" | grep -q 'apt-get update, Oh My Zsh install, nvm install, Oh My Posh install\. Configs are copied' || {
+  printf 'missing summary of failed steps\n%s\n' "$out" >&2
+  exit 1
+}
+# No sudo still falls back to ~/.local.
+printf '%s\n' "$out" | grep -q 'Installing eza into ~/.local/bin' || {
+  printf 'no ~/.local fallback without sudo\n%s\n' "$out" >&2
+  exit 1
+}
 
 echo ok
