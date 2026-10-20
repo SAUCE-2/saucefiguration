@@ -263,15 +263,10 @@ install_user() {
 # fetch a newer toolchain by itself.
 go_min_minor=24
 
-# True when Go is at least 1.$go_min_minor. $1 is a version string such as
-# go1.24.2 (for tests); without it, ask the go on PATH.
-go_new_enough() {
-  local v=${1:-} major minor
-  if [ -z "$v" ]; then
-    have go || return 1
-    v=$(go env GOVERSION 2>/dev/null) || return 1
-  fi
-  v=${v#go}
+# True when the version string $1 (such as go1.24.2) is at least
+# 1.$go_min_minor.
+go_version_ok() {
+  local v=${1#go} major minor
   major=${v%%.*}
   minor=${v#*.}
   minor=${minor%%[!0-9]*}
@@ -279,6 +274,14 @@ go_new_enough() {
     *[!0-9:]* | :* | *:) return 1 ;;
   esac
   [ "$major" -gt 1 ] || { [ "$major" -eq 1 ] && [ "$minor" -ge "$go_min_minor" ]; }
+}
+
+# True when the go on PATH is new enough for bootdev.
+go_new_enough() {
+  local v
+  have go || return 1
+  v=$(go env GOVERSION 2>/dev/null) || return 1
+  go_version_ok "$v"
 }
 
 # Latest Go from go.dev into ~/.local/go, replacing any older copy there.
