@@ -299,10 +299,11 @@ ak_backup=$(ls "$akh/.ssh"/authorized_keys.bak.*) || {
   echo 'authorized_keys backup does not hold the old file' >&2
   exit 1
 }
-# ls -l, not stat: GNU and BSD (macOS) stat take different flags.
+# find -perm, not stat: GNU and BSD (macOS) stat take different flags.
 for f in "$ak_backup" "$akh/.ssh/authorized_keys"; do
-  [ "$(ls -l "$f" | cut -c2-10)" = rw------- ] || {
-    echo "authorized_keys mode: $(ls -l "$f")" >&2
+  [ -n "$(find "$f" -perm 600)" ] || {
+    echo 'authorized_keys mode is not 600:' >&2
+    ls -l "$f" >&2
     exit 1
   }
 done
