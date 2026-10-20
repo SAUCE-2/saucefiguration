@@ -22,7 +22,6 @@ plugins=(
   command-not-found
   dotenv
   eza
-  fnm
   fzf
   git
   git-auto-fetch
@@ -79,10 +78,10 @@ setopt HIST_IGNORE_DUPS
 setopt HIST_EXPIRE_DUPS_FIRST
 setopt HIST_FIND_NO_DUPS
 
-# Node version management.
-if (( $+commands[fnm] )); then
-  eval "$(fnm env --use-on-cd --shell zsh)"
-fi
+# Node version management (nvm, installed by install.sh).
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
 
 # Cloudflare CLI completion, written by install.sh. Tab still runs `cf`.
 [ -f "$HOME/.config/cf/complete.zsh" ] && . "$HOME/.config/cf/complete.zsh"
