@@ -288,7 +288,7 @@ copy_file() {
 # SAUCE_ROOT is for tests; live runs use this script's path.
 install_dotfiles() {
   local root platform
-  root=${SAUCE_ROOT:-$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)} || return 1
+  root=${SAUCE_ROOT:-$(CDPATH='' cd -- "$(dirname "$0")/.." && pwd)} || return 1
   case "$(uname -s)" in
     Darwin) platform=darwin ;;
     *) platform=linux ;;
@@ -327,7 +327,7 @@ install_dotfiles() {
 # SAUCE_ROOT / SAUCE_STATE_DIR are for tests; live runs use this script's path.
 record_install_rev() {
   local root sha state
-  root=${SAUCE_ROOT:-$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)} || return 0
+  root=${SAUCE_ROOT:-$(CDPATH='' cd -- "$(dirname "$0")/.." && pwd)} || return 0
   sha=$(git -C "$root" rev-parse HEAD 2>/dev/null) || return 0
   state="${SAUCE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/saucefiguration}"
   if [ "${DRY_RUN:-0}" = 1 ]; then
@@ -663,6 +663,7 @@ for entry in $packages; do
   # Entries with no binary are plugin files, checked by the probe below.
   [ -n "$binaries" ] || continue
   # Word splitting on the comma list is deliberate: one tool, several names.
+  # shellcheck disable=SC2046
   check "${entry%%:*}" $(echo "$binaries" | tr ',' ' ') || missing=$((missing + 1))
 done
 
