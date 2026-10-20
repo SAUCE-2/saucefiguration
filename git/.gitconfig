@@ -5,7 +5,6 @@
 
 [core]
 	autocrlf = input
-	eol = lf
 	editor = nano
 	untrackedCache = true
 	longpaths = true
@@ -36,7 +35,7 @@
 
 [fetch]
 	prune = true
-	pruneTags = true
+	# No pruneTags: it deletes unpushed local tags on every fetch, git-auto-fetch included.
 
 [commit]
 	gpgsign = true
