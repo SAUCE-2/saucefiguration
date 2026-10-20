@@ -119,6 +119,10 @@ err=$(copy_file "$src" "$dest" 2>&1 >/dev/null) || true
   printf 'identical dest should be silent\n%s\n' "$err" >&2
   exit 1
 }
+ls "$dest".bak.* >/dev/null 2>&1 && {
+  echo 'identical dest should not leave a backup' >&2
+  exit 1
+}
 
 printf 'old\n' >"$dest"
 err=$(copy_file "$src" "$dest" 2>&1 >/dev/null) || true
@@ -128,6 +132,19 @@ printf '%s\n' "$err" | grep -q "replacing $dest" || {
 }
 [ "$(cat "$dest")" = new ] || {
   echo 'copy_file did not replace dest' >&2
+  exit 1
+}
+# The old dest is kept next to it, and the warning says where.
+backup=$(printf '%s\n' "$err" | sed -n 's/.*(backup: \(.*\))$/\1/p')
+case "$backup" in
+  "$dest".bak.[0-9]*) ;;
+  *)
+    printf 'warning should name a %s.bak.<time> backup\n%s\n' "$dest" "$err" >&2
+    exit 1
+    ;;
+esac
+[ "$(cat "$backup")" = old ] || {
+  echo 'backup does not hold the old dest' >&2
   exit 1
 }
 
@@ -143,6 +160,7 @@ copy_file "$src" "$dest" 2>/dev/null
 exec 3<&-
 
 printf 'old\n' >"$dest"
+rm -f "$dest".bak.*
 err=$(DRY_RUN=1 copy_file "$src" "$dest" 2>&1) || true
 printf '%s\n' "$err" | grep -q "replacing $dest" || {
   printf 'dry-run missing replacement warning\n%s\n' "$err" >&2
@@ -154,6 +172,10 @@ printf '%s\n' "$err" | grep -q "would copy $src -> $dest" || {
 }
 [ "$(cat "$dest")" = old ] || {
   echo 'dry-run replaced dest' >&2
+  exit 1
+}
+ls "$dest".bak.* >/dev/null 2>&1 && {
+  echo 'dry-run left a backup' >&2
   exit 1
 }
 
@@ -239,6 +261,52 @@ printf '%s\n' "$err" | grep -q "replacing $home/.zshrc" || {
 }
 [ "$(stat -c %a "$home/.ssh/config")" = 600 ] || {
   echo "ssh config mode: $(stat -c %a "$home/.ssh/config")" >&2
+  exit 1
+}
+
+# authorized_keys on a server: keys only it has survive, after the repo's.
+# The repo's line for a key replaces an old one with another comment.
+aktree="$work/aktree"
+cp -R "$tree" "$aktree"
+printf '%s\n' \
+  'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIrepo1 s@desktop' \
+  'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIrepo2 s@macbook' >"$aktree/ssh/authorized_keys"
+akh="$work/akhome"
+mkdir -p "$akh/.ssh"
+printf '%s\n' \
+  'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIrepo1 old-comment' \
+  '' \
+  'from="10.0.0.0/8",no-pty ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIserver deploy@ci' >"$akh/.ssh/authorized_keys"
+chmod 600 "$akh/.ssh/authorized_keys"
+old_keys=$(cat "$akh/.ssh/authorized_keys")
+HOME="$akh" SAUCE_ROOT="$aktree" install_dotfiles >/dev/null 2>&1 || true
+want=$(printf '%s\n' \
+  'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIrepo1 s@desktop' \
+  'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIrepo2 s@macbook' \
+  'from="10.0.0.0/8",no-pty ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIserver deploy@ci')
+[ "$(cat "$akh/.ssh/authorized_keys")" = "$want" ] || {
+  printf 'authorized_keys merge\n%s\n' "$(cat "$akh/.ssh/authorized_keys")" >&2
+  exit 1
+}
+ak_backup=$(ls "$akh/.ssh"/authorized_keys.bak.*) || {
+  echo 'replaced authorized_keys has no backup' >&2
+  exit 1
+}
+[ "$(cat "$ak_backup")" = "$old_keys" ] || {
+  echo 'authorized_keys backup does not hold the old file' >&2
+  exit 1
+}
+# ls -l, not stat: GNU and BSD (macOS) stat take different flags.
+for f in "$ak_backup" "$akh/.ssh/authorized_keys"; do
+  [ "$(ls -l "$f" | cut -c2-10)" = rw------- ] || {
+    echo "authorized_keys mode: $(ls -l "$f")" >&2
+    exit 1
+  }
+done
+# Re-run: the merge is stable, so nothing is replaced or backed up again.
+err=$(HOME="$akh" SAUCE_ROOT="$aktree" install_dotfiles 2>&1 >/dev/null) || true
+printf '%s\n' "$err" | grep -q 'replacing' && {
+  printf 're-run should replace nothing\n%s\n' "$err" >&2
   exit 1
 }
 

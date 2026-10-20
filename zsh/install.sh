@@ -2,8 +2,9 @@
 # Installs everything the .zshrc files in this directory expect to find.
 # Run this after zsh itself is installed. Safe to re-run. Copies this
 # clone's configs into $HOME and warns when it replaces a file that
-# already exists. Stamps this clone's HEAD so the next shell can notice
-# new commits and offer to update (see check-update.sh).
+# already exists, keeping the old one as <file>.bak.<time>. Stamps this
+# clone's HEAD so the next shell can notice new commits and offer to
+# update (see check-update.sh).
 #
 #   ./install.sh            install
 #   ./install.sh --dry-run  print the commands instead of running them
@@ -249,9 +250,11 @@ install_user() {
 }
 
 # Copy $1 onto $2. Identical dest is a no-op. Anything else already there
-# is overwritten after a warning. $3 is an optional chmod mode.
+# is kept as $2.bak.<time>, then overwritten after a warning. Local edits,
+# such as git config --global writes, would be lost otherwise. $3 is an
+# optional chmod mode.
 copy_file() {
-  local src=$1 dest=$2 mode=${3:-}
+  local src=$1 dest=$2 mode=${3:-} backup=
   if [ ! -f "$src" ]; then
     warn "missing $src"
     return 1
@@ -261,7 +264,9 @@ copy_file() {
     if cmp -s "$src" "$dest"; then
       return 0
     fi
-    printf '\033[1;33mwarn:\033[0m replacing %s\n' "$dest" >&2
+    # A dangling symlink has nothing to keep.
+    [ -f "$dest" ] && backup="$dest.bak.$(date +%Y%m%d%H%M%S)"
+    printf '\033[1;33mwarn:\033[0m replacing %s%s\n' "$dest" "${backup:+ (backup: $backup)}" >&2
   elif [ -e "$dest" ]; then
     warn "not a file: $dest"
     return 1
@@ -273,6 +278,10 @@ copy_file() {
   fi
 
   mkdir -p "$(dirname "$dest")"
+  # -p keeps the mode, so a backup in ~/.ssh is no more open than the original.
+  if [ -n "$backup" ]; then
+    cp -p "$dest" "$backup" || return 1
+  fi
   # Write a temp file and rename it over dest. Rewriting dest in place would
   # corrupt a shell still reading it: the update check runs this from inside
   # ~/.zshrc. Renaming also replaces a dest symlink instead of writing through.
@@ -282,6 +291,28 @@ copy_file() {
     chmod "$mode" "$tmp"
   fi
   mv -f "$tmp" "$dest"
+}
+
+# authorized_keys is merged, not replaced: the repo's lines, then any key the
+# machine already trusts that the repo does not list. Replacing it would lock
+# you out of a server whose key lives only there. Lines match on the base64
+# key blob (it always starts "AAAA"), so the repo's line for a key wins over
+# an old one with other options or comment.
+merge_authorized_keys() {
+  local src=$1 dest=$2 old=/dev/null merged rc=0
+  [ -f "$dest" ] && old=$dest
+  merged=$(mktemp "${TMPDIR:-/tmp}/authorized_keys.XXXXXX") || return 1
+  awk '
+    {
+      sub(/\r$/, "")
+      id = $0
+      for (i = 1; i <= NF; i++) if ($i ~ "^AAAA[0-9A-Za-z+/]+=*$") { id = $i; break }
+    }
+    FILENAME == ARGV[1] { repo[id] = 1; print; next }
+    NF && !(id in repo)
+  ' "$src" "$old" >"$merged" && copy_file "$merged" "$dest" 600 || rc=$?
+  rm -f "$merged"
+  return "$rc"
 }
 
 # Repo configs -> the paths the shell, git and ssh already look at.
@@ -317,7 +348,8 @@ install_dotfiles() {
     [ -f "$src" ] || continue
     name=$(basename "$src")
     case "$name" in
-      config | authorized_keys) copy_file "$src" "$HOME/.ssh/$name" 600 ;;
+      config) copy_file "$src" "$HOME/.ssh/$name" 600 ;;
+      authorized_keys) merge_authorized_keys "$src" "$HOME/.ssh/$name" ;;
       *) copy_file "$src" "$HOME/.ssh/$name" ;;
     esac
   done
