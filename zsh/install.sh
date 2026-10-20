@@ -40,6 +40,15 @@ log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33mskip:\033[0m %s\n' "$*" >&2; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# For a step that errored (no sudo, broken apt repo, offline). Under set -e it
+# would end the run before the configs are copied and the rev stamped, so warn,
+# keep going, and list it at the end.
+failed=
+fail() {
+  warn "$1 failed${2:+; $2}"
+  failed="${failed:+$failed, }$1"
+}
+
 # Wraps every mutating command so --dry-run can show it instead.
 run() {
   if [ "${DRY_RUN:-0}" = 1 ]; then
@@ -437,7 +446,8 @@ fi
 # Homebrew is the one package manager we can install ourselves.
 if [ "$PM" = brew ] && ! have brew; then
   log "Installing Homebrew"
-  run bash -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+  run bash -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' ||
+    fail "Homebrew install"
   for prefix in /opt/homebrew /usr/local; do
     if [ -x "$prefix/bin/brew" ]; then
       eval "$("$prefix/bin/brew" shellenv)"
@@ -448,7 +458,7 @@ fi
 
 if [ "$PM" = apt-get ] && [ "$PM_WRITE" = 1 ]; then
   log "Refreshing apt package lists"
-  as_root apt-get update
+  as_root apt-get update || fail "apt-get update" "installing from the cached package lists"
 fi
 
 log "Installing packages"
@@ -491,7 +501,8 @@ else
   log "Installing Oh My Zsh"
   # KEEP_ZSHRC stops omz writing a default .zshrc; we copy this repo's one
   # later. CHSH leaves the login shell alone, RUNZSH keeps this script going.
-  run bash -c 'RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"'
+  run bash -c 'RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"' ||
+    fail "Oh My Zsh install"
 fi
 
 # ssh-agent ships with OpenSSH. Skip Homebrew: Apple's /usr/bin/ssh is what
@@ -515,7 +526,8 @@ if [ -s "$NVM_DIR/nvm.sh" ]; then
 else
   log "Installing nvm into ~/.nvm"
   # PROFILE=/dev/null: the .zshrc in this repo already sources nvm.sh.
-  run bash -c 'curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | PROFILE=/dev/null bash'
+  run bash -c 'curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | PROFILE=/dev/null bash' ||
+    fail "nvm install"
 fi
 
 # nvm is a shell function, so load it here. nvm.sh trips over `set -u`.
@@ -548,10 +560,12 @@ if have oh-my-posh; then
   log "Oh My Posh already installed"
 elif [ "$PM" = brew ]; then
   log "Installing Oh My Posh"
-  run brew install oh-my-posh || run brew install jandedobbeleer/oh-my-posh/oh-my-posh
+  run brew install oh-my-posh || run brew install jandedobbeleer/oh-my-posh/oh-my-posh ||
+    fail "Oh My Posh install"
 else
   log "Installing Oh My Posh into ~/.local/bin"
-  run bash -c 'curl -fsSL https://ohmyposh.dev/install.sh | bash -s'
+  run bash -c 'curl -fsSL https://ohmyposh.dev/install.sh | bash -s' ||
+    fail "Oh My Posh install"
 fi
 
 # Cloudflare CLI (`cf`), now in beta. Not in distro repos; the npm package
@@ -687,5 +701,11 @@ if [ "$missing" -gt 0 ]; then
 fi
 
 install_dotfiles
+# Stamp even when a step failed: the configs are in, and an unstamped rev
+# would have every new shell offer the same update again.
 record_install_rev
+if [ -n "$failed" ]; then
+  printf '\033[1;31mfailed:\033[0m %s. Configs are copied; re-run %s to retry.\n' "$failed" "$0" >&2
+  exit 1
+fi
 log "Done."
