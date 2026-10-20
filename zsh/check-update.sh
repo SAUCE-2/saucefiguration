@@ -109,9 +109,13 @@ if [ -z "${SAUCE_UPDATE_ANSWER+x}" ]; then
   if [ ! -t 0 ] || [ ! -t 1 ]; then
     exit 0
   fi
-  # timeout 0: data waiting? do not consume it (user already started typing).
-  if read -r -t 0; then
-    exit 0
+  # Data waiting? The user already started typing: leave it for zsh, no prompt.
+  # bash 4+ peeks with read -t 0. bash 3.2 (macOS /bin/bash) fails that without
+  # looking, so the prompt ate the first key; zsh's zselect peeks instead.
+  if [ "${BASH_VERSINFO[0]}" -ge 4 ]; then
+    read -r -t 0 && exit 0
+  else
+    zsh -fc 'zmodload zsh/zselect && zselect -t 0 -r 0' 2>/dev/null && exit 0
   fi
   printf '[saucefiguration] Would you like to update? [Y/n] '
   read -r -n 1 option || option=n
