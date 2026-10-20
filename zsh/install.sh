@@ -258,6 +258,59 @@ install_user() {
   esac
 }
 
+# Boot.dev CLI's go.mod wants Go 1.24. Distro Go often lags (Debian 12 ships
+# 1.19), and Debian and Fedora pin GOTOOLCHAIN=local, so an old go will not
+# fetch a newer toolchain by itself.
+go_min_minor=24
+
+# True when Go is at least 1.$go_min_minor. $1 is a version string such as
+# go1.24.2 (for tests); without it, ask the go on PATH.
+go_new_enough() {
+  local v=${1:-} major minor
+  if [ -z "$v" ]; then
+    have go || return 1
+    v=$(go env GOVERSION 2>/dev/null) || return 1
+  fi
+  v=${v#go}
+  major=${v%%.*}
+  minor=${v#*.}
+  minor=${minor%%[!0-9]*}
+  case "$major:$minor" in
+    *[!0-9:]* | :* | *:) return 1 ;;
+  esac
+  [ "$major" -gt 1 ] || { [ "$major" -eq 1 ] && [ "$minor" -ge "$go_min_minor" ]; }
+}
+
+# Latest Go from go.dev into ~/.local/go, replacing any older copy there.
+# Linux only; Homebrew's go is current.
+install_go_user() {
+  local arch ver tmp
+  case $(uname -m) in
+    x86_64 | amd64) arch=amd64 ;;
+    aarch64 | arm64) arch=arm64 ;;
+    *) return 1 ;;
+  esac
+  [ "${DRY_RUN:-0}" = 1 ] && {
+    printf '   would install Go (linux-%s) into ~/.local/go\n' "$arch"
+    return 0
+  }
+  ver=$(curl -fsSL 'https://go.dev/VERSION?m=text') || return 1
+  ver=${ver%%$'\n'*}
+  case "$ver" in
+    go[0-9]*) ;;
+    *) return 1 ;;
+  esac
+  tmp=$(mktemp -d) || return 1
+  if ! curl -fsSL "https://go.dev/dl/${ver}.linux-${arch}.tar.gz" | tar -xz -C "$tmp"; then
+    rm -rf "$tmp"
+    return 1
+  fi
+  mkdir -p "$HOME/.local"
+  rm -rf "$HOME/.local/go"
+  mv "$tmp/go" "$HOME/.local/go"
+  rm -rf "$tmp"
+}
+
 # Copy $1 onto $2. Identical dest is a no-op. Anything else already there
 # is kept as $2.bak.<time>, then overwritten after a warning. Local edits,
 # such as git config --global writes, would be lost otherwise. $3 is an
@@ -635,24 +688,28 @@ if have cf; then
   fi
 fi
 
-# Boot.dev CLI. Needs a recent Go toolchain; lands in ~/go/bin (on PATH above).
+# Boot.dev CLI. Lands in ~/go/bin (on PATH above).
 # https://github.com/bootdotdev/bootdev
-export PATH="$HOME/go/bin:$PATH"
+# ~/.local/go/bin goes first so the go.dev Go wins over an old distro one.
+export PATH="$HOME/.local/go/bin:$HOME/go/bin:$PATH"
 if have bootdev; then
   log "Boot.dev CLI already installed"
 else
-  if ! have go; then
+  if ! go_new_enough; then
     if [ "$PM" = brew ]; then
       log "Installing Go (needed for Boot.dev CLI)"
       install_pkg go || warn "brew could not install go"
-    elif [ "$PM_WRITE" = 1 ]; then
+    elif [ "$PM_WRITE" = 1 ] && ! have go; then
       log "Installing Go (needed for Boot.dev CLI)"
-      install_pkg go || warn "$PM has no '$(pkg_name "$PM" go)'; install Go yourself for bootdev"
-    else
-      warn "no go and package db is read-only; install Go yourself for bootdev"
+      install_pkg go || warn "$PM has no '$(pkg_name "$PM" go)'"
+    fi
+    # Distro Go too old, missing, or the package db is read-only.
+    if [ "$PM" != brew ] && ! go_new_enough; then
+      log "Installing Go 1.$go_min_minor+ from go.dev into ~/.local/go"
+      install_go_user || warn "could not install Go; install Go 1.$go_min_minor+ yourself for bootdev"
     fi
   fi
-  if have go; then
+  if go_new_enough || [ "${DRY_RUN:-0}" = 1 ]; then
     log "Installing Boot.dev CLI"
     run go install github.com/bootdotdev/bootdev@latest ||
       warn "go install bootdev failed"
@@ -700,7 +757,7 @@ log "Verifying what the shell config will find"
 missing=0
 # zsh is a prerequisite rather than a package here. Vendor CLIs above;
 # ssh-agent ships with OpenSSH.
-for tool in zsh nvm node pnpm oh-my-posh cf bootdev tailscale dotenv dotenv-linter ssh-agent ssh-add; do
+for tool in zsh nvm node pnpm oh-my-posh cf go bootdev tailscale dotenv dotenv-linter ssh-agent ssh-add; do
   check "$tool" "$tool" || missing=$((missing + 1))
 done
 

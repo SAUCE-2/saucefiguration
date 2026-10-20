@@ -25,6 +25,18 @@ file_mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
   echo 'pkg_name dnf go' >&2
   exit 1
 }
+for v in go1.24.2 go1.24 go1.25.3 go2.0; do
+  go_new_enough "$v" || {
+    echo "go_new_enough $v should pass" >&2
+    exit 1
+  }
+done
+for v in go1.19.8 go1.23.4 go1.9 devel garbage; do
+  go_new_enough "$v" && {
+    echo "go_new_enough $v should fail" >&2
+    exit 1
+  }
+done
 [ "$(pkg_name pacman eza)" = eza ] || {
   echo 'pkg_name passthrough' >&2
   exit 1
