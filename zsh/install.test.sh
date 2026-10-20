@@ -209,8 +209,9 @@ copy_file "$src" "$mode_dest" 600
 # Full set of repo configs into a fake $HOME.
 tree="$work/repo"
 home="$work/home"
-mkdir -p "$tree/zsh/linux" "$tree/tmux" "$tree/git" "$tree/ohmyposh" "$tree/ssh"
+mkdir -p "$tree/zsh/linux" "$tree/zsh/darwin" "$tree/tmux" "$tree/git" "$tree/ohmyposh" "$tree/ssh"
 printf 'zshrc\n' >"$tree/zsh/linux/.zshrc"
+printf 'zshrc\n' >"$tree/zsh/darwin/.zshrc"
 printf 'tmux\n' >"$tree/tmux/.tmux.conf"
 printf 'gitconfig\n' >"$tree/git/.gitconfig"
 printf 'ignore\n' >"$tree/git/.gitignore_global"

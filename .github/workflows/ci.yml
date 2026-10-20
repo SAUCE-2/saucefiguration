@@ -1,0 +1,89 @@
+# The checks from CLAUDE.md, on Linux and on macOS. macOS runs the tests
+# under Apple's /bin/bash 3.2, the oldest bash the scripts must support.
+# The tests write only to mktemp dirs, never the real $HOME, and run no
+# package manager, so the runner's own config is left alone.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  checks:
+    name: checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            bash: bash
+          - os: macos-latest
+            bash: /bin/bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install zsh and shellcheck
+        if: runner.os == 'Linux'
+        run: |
+          pkgs=()
+          command -v zsh >/dev/null || pkgs+=(zsh)
+          command -v shellcheck >/dev/null || pkgs+=(shellcheck)
+          if [ "${#pkgs[@]}" -gt 0 ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends "${pkgs[@]}"
+          fi
+
+      # Homebrew's bash comes first on the runner's PATH, and
+      # check-update.test.sh runs `bash check-update.sh` through PATH.
+      - name: Put /bin/bash first on PATH
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          ln -sf /bin/bash "$RUNNER_TEMP/bin/bash"
+          echo "$RUNNER_TEMP/bin" >>"$GITHUB_PATH"
+
+      - name: Tool versions
+        run: |
+          ${{ matrix.bash }} --version
+          zsh --version
+          if [ "$RUNNER_OS" = Linux ]; then shellcheck --version; fi
+          # The tests also call `bash` through PATH; it must be the same one.
+          want=$(${{ matrix.bash }} --version | sed -n 1p)
+          got=$(bash --version | sed -n 1p)
+          echo "bash on PATH: $(command -v bash): $got"
+          [ "$got" = "$want" ] || {
+            echo "::error::bash on PATH is $got, want $want"
+            exit 1
+          }
+
+      - name: install.test.sh
+        if: ${{ !cancelled() }}
+        run: ${{ matrix.bash }} zsh/install.test.sh
+
+      - name: check-update.test.sh
+        if: ${{ !cancelled() }}
+        run: ${{ matrix.bash }} zsh/check-update.test.sh
+
+      - name: shellcheck
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        run: shellcheck zsh/*.sh
+
+      - name: zsh -n
+        if: ${{ !cancelled() }}
+        run: zsh -n zsh/linux/.zshrc zsh/darwin/.zshrc
