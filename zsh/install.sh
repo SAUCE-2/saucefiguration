@@ -504,32 +504,42 @@ if [ "$PM" != brew ]; then
   fi
 fi
 
-if have fnm; then
-  log "fnm already installed"
-elif [ "$PM" = brew ]; then
-  log "Installing fnm"
-  install_pkg fnm || warn "brew could not install fnm"
+# Node.js the way nodejs.org suggests: nvm, then Node, then pnpm via Corepack.
+# Same on Darwin; nvm does not support its Homebrew formula.
+node_major=26
+export NVM_DIR="$HOME/.nvm"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  log "nvm already installed"
 else
-  log "Installing fnm into ~/.local/share/fnm"
-  if ! have unzip && [ "$PM_WRITE" = 1 ]; then
-    install_pkg unzip || warn "no unzip; the fnm installer needs it"
-  fi
-  # --skip-shell: the .zshrc in this repo already runs `fnm env`.
-  run bash -c 'curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell'
+  log "Installing nvm into ~/.nvm"
+  # PROFILE=/dev/null: the .zshrc in this repo already sources nvm.sh.
+  run bash -c 'curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | PROFILE=/dev/null bash'
 fi
 
-# fnm brings no Node of its own. Take the newest LTS (a re-run picks up a
-# newer one) and make it the default, so npm exists below and in new shells.
-export PATH="$HOME/.local/share/fnm:$PATH"
-if have fnm; then
-  log "Installing the latest Node.js LTS"
-  run fnm install --lts || warn "fnm could not install the Node.js LTS"
-  run fnm default lts-latest || warn "fnm could not make the LTS its default"
-  if [ "${DRY_RUN:-0}" != 1 ]; then
-    eval "$(fnm env --shell bash)"
-  fi
+# nvm is a shell function, so load it here. nvm.sh trips over `set -u`.
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  set +u
+  # shellcheck disable=SC1091
+  . "$NVM_DIR/nvm.sh"
+  log "Installing Node.js $node_major"
+  run nvm install "$node_major" || warn "nvm could not install Node.js $node_major"
+  run nvm alias default "$node_major" || warn "nvm could not make Node.js $node_major its default"
+  set -u
+elif [ "${DRY_RUN:-0}" = 1 ]; then
+  log "Installing Node.js $node_major"
+  printf '   would run: nvm install %s\n' "$node_major"
 else
-  warn "no fnm; install Node.js yourself"
+  warn "no nvm; install Node.js yourself"
+fi
+
+if have pnpm; then
+  log "pnpm already installed"
+elif have npm || [ "${DRY_RUN:-0}" = 1 ]; then
+  log "Installing pnpm with Corepack"
+  run npm install --global corepack || warn "npm could not install corepack"
+  run corepack enable pnpm || warn "corepack could not enable pnpm"
+else
+  warn "no npm; pnpm needs Node.js (npm install --global corepack && corepack enable pnpm)"
 fi
 
 if have oh-my-posh; then
@@ -543,9 +553,9 @@ else
 fi
 
 # Cloudflare CLI (`cf`), now in beta. Not in distro repos; the npm package
-# needs Node.js 22.18+ (the LTS above is newer).
+# needs Node.js 22.18+ (the Node above is newer).
 # https://developers.cloudflare.com/changelog/post/2026-09-28-cloudflare-cli-beta/
-# npm's global bin is not always on PATH yet (fnm).
+# npm's global bin is not always on PATH yet.
 if have npm; then
   npm_prefix=$(npm prefix -g 2>/dev/null) || npm_prefix=
   if [ -n "${npm_prefix}" ] && [ -d "${npm_prefix}/bin" ]; then
@@ -642,7 +652,7 @@ log "Verifying what the shell config will find"
 missing=0
 # zsh is a prerequisite rather than a package here. Vendor CLIs above;
 # ssh-agent ships with OpenSSH.
-for tool in zsh fnm node oh-my-posh cf bootdev tailscale dotenv dotenv-linter ssh-agent ssh-add; do
+for tool in zsh nvm node pnpm oh-my-posh cf bootdev tailscale dotenv dotenv-linter ssh-agent ssh-add; do
   check "$tool" "$tool" || missing=$((missing + 1))
 done
 
