@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Self-check for check-update.sh: fake clone, stamp a rev, add a commit, expect
-# the notice to name that commit and the config file it touched. A GitHub sha
-# we have not fetched is not a prompt. Y pulls when upstream is ahead.
+# the notice to name that commit and the config file it touched. An upstream
+# commit we have not fetched is not a prompt. Y pulls when upstream is ahead.
 set -euo pipefail
 
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
@@ -64,15 +64,6 @@ out=$(SAUCE_STATE_DIR="$state" bash "$root/zsh/check-update.sh" || true)
   exit 1
 }
 
-# A cached GitHub tip we never fetched is not something we can install.
-printf 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n' >"$state/remote_sha"
-out=$(SAUCE_STATE_DIR="$state" bash "$root/zsh/check-update.sh" || true)
-[ -z "$out" ] || {
-  printf 'prompted for a commit that is not in the clone\n%s\n' "$out" >&2
-  exit 1
-}
-rm -f "$state/remote_sha"
-
 printf '%s\n' '#!/bin/sh' "echo ran >\"$state/installed\"" >"$work/zsh/install.sh"
 chmod +x "$work/zsh/install.sh"
 git -C "$work" add zsh/install.sh
@@ -100,10 +91,16 @@ git -C "$pair/origin" branch -M main
 git clone -q "$pair/origin" "$pair/clone"
 printf '%s\n' '#!/bin/sh' "echo pulled >\"$state/pulled\"" >"$pair/origin/zsh/install.sh"
 git -C "$pair/origin" commit -q -am 'feat(zsh): real update'
-git -C "$pair/clone" fetch -q
 printf '%s\n' "$pair/clone" >"$state/repo"
 printf '%s\n' "$(git -C "$pair/clone" rev-parse HEAD)" >"$state/sha"
 rm -f "$state/snooze"
+# Origin moved but the clone has not fetched it: nothing to install, no prompt.
+out=$(SAUCE_STATE_DIR="$state" bash "$root/zsh/check-update.sh" || true)
+[ -z "$out" ] || {
+  printf 'prompted for a commit that is not in the clone\n%s\n' "$out" >&2
+  exit 1
+}
+git -C "$pair/clone" fetch -q
 out=$(SAUCE_UPDATE_ANSWER=y SAUCE_STATE_DIR="$state" bash "$root/zsh/check-update.sh" || true)
 [ "$(git -C "$pair/clone" rev-parse HEAD)" = "$(git -C "$pair/origin" rev-parse HEAD)" ] || {
   printf 'Y did not pull\n%s\n' "$out" >&2
