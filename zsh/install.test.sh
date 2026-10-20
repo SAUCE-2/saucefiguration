@@ -374,7 +374,9 @@ printf '%s\n' '#!/bin/sh' 'exit 100' >"$stubs/apt-get"
 # A script that fails, for the installers piped from curl into a shell.
 printf '%s\n' '#!/bin/sh' 'echo "exit 7"' 'exit 22' >"$stubs/curl"
 printf '%s\n' '#!/bin/sh' 'case "$*" in *rev-parse*) echo 1111111111111111111111111111111111111111 ;; *) exit 128 ;; esac' >"$stubs/git"
-chmod +x "$stubs"/*
+# Only the scripts: chmod follows the symlinks above to the real tools, which
+# a non-root user (CI) may not change.
+chmod +x "$stubs/uname" "$stubs/id" "$stubs/sudo" "$stubs/apt-get" "$stubs/curl" "$stubs/git"
 fail_home="$work/failhome"
 mkdir -p "$fail_home"
 status=0
