@@ -61,12 +61,21 @@ pm_can_write brew || {
 
 mkdir -p "$work/home/.local/share/zsh-autosuggestions"
 touch "$work/home/.local/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
-got=$(HOME="$work/home" find_plugin zsh-autosuggestions) || {
+# find_plugin looks in $HOMEBREW_PREFIX first, and the darwin .zshrc exports
+# it. Clear it so a brew-installed copy on this machine can't answer.
+got=$(HOMEBREW_PREFIX='' HOME="$work/home" find_plugin zsh-autosuggestions) || {
   echo 'find_plugin missed ~/.local/share' >&2
   exit 1
 }
 [ "$got" = "$work/home/.local/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ] || {
   echo "find_plugin path: $got" >&2
+  exit 1
+}
+mkdir -p "$work/brew/share/zsh-autosuggestions"
+touch "$work/brew/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+got=$(HOMEBREW_PREFIX="$work/brew" HOME="$work/home" find_plugin zsh-autosuggestions)
+[ "$got" = "$work/brew/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ] || {
+  echo "find_plugin should prefer Homebrew's copy: $got" >&2
   exit 1
 }
 
