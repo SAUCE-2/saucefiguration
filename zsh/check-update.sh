@@ -104,6 +104,16 @@ if [ -n "$files" ]; then
   echo
 fi
 
+# install.sh copies the working tree, not HEAD, and this clone is where the
+# repo gets edited. Don't let Enter install half-done work: tracked changes
+# (staged or not), or new files in the dirs install.sh copies whole. No snooze,
+# so the prompt is back once the tree is clean.
+if ! git_c diff --quiet HEAD -- ||
+  [ -n "$(git_c ls-files --others --exclude-standard -- git ohmyposh ssh)" ]; then
+  msg "the clone has uncommitted changes; commit or stash them, then run \`$repo/zsh/install.sh\`"
+  exit 0
+fi
+
 # omz prompt mode: Y/n on a tty. Pipes and tests skip unless they set an answer.
 if [ -z "${SAUCE_UPDATE_ANSWER+x}" ]; then
   if [ ! -t 0 ] || [ ! -t 1 ]; then
