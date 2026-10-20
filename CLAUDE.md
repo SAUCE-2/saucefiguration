@@ -32,6 +32,9 @@ shellcheck zsh/*.sh
 zsh -n zsh/linux/.zshrc zsh/darwin/.zshrc
 ```
 
+CI (`.github/workflows/ci.yml`) runs these on Linux and macOS, the tests
+under macOS's `/bin/bash` 3.2.
+
 ## Commits
 
 Conventional commits scoped by directory: `feat(zsh): ...`, `fix(git): ...`.
