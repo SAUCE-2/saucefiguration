@@ -37,6 +37,9 @@ plugins=(
   zsh-interactive-cd
 )
 
+# omz's tmux plugin prints an error at every start if tmux is missing.
+(( $+commands[tmux] )) && plugins+=(tmux)
+
 # After each command, print any shorter alias you could have used instead.
 zstyle ':omz:plugins:alias-finder' autoload yes
 zstyle ':omz:plugins:alias-finder' cheaper yes

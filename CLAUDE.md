@@ -9,11 +9,12 @@ symlinked. The user copies them into place by hand.
 - `git/.gitconfig`: global git config. Commits and tags are SSH-signed.
 - `ssh/`: client config, `authorized_keys` and `allowed_signers`. Public keys only.
 - `ohmyposh/theme.omp.json`: prompt theme.
+- `tmux/.tmux.conf`: tmux config, copied to `~/.tmux.conf`.
 
 ## Rules
 
 - Edit files in this repo only. Never touch the live copies in `$HOME`
-  (`~/.zshrc`, `~/.gitconfig`, `~/.ssh/`, `~/.config/`).
+  (`~/.zshrc`, `~/.gitconfig`, `~/.tmux.conf`, `~/.ssh/`, `~/.config/`).
 - Never read or commit private keys.
 - Don't run `zsh/install.sh` without `--dry-run` unless asked. It installs
   system packages.

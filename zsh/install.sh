@@ -31,6 +31,7 @@ packages="
   fzf:fzf
   zoxide:zoxide
   lazygit:lazygit
+  tmux:tmux
   zsh-autosuggestions:
   zsh-syntax-highlighting:
 "
@@ -295,6 +296,7 @@ install_dotfiles() {
 
   log "Copying config files"
   copy_file "$root/zsh/$platform/.zshrc" "$HOME/.zshrc"
+  copy_file "$root/tmux/.tmux.conf" "$HOME/.tmux.conf"
 
   # These dirs map 1:1 onto a dest dir. Copy every file so a new one cannot
   # sit in the clone unused (.[!.]* covers .gitconfig / .gitignore_global).
