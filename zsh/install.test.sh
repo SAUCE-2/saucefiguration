@@ -184,8 +184,9 @@ copy_file "$src" "$mode_dest" 600
 # Full set of repo configs into a fake $HOME.
 tree="$work/repo"
 home="$work/home"
-mkdir -p "$tree/zsh/linux" "$tree/git" "$tree/ohmyposh" "$tree/ssh"
+mkdir -p "$tree/zsh/linux" "$tree/tmux" "$tree/git" "$tree/ohmyposh" "$tree/ssh"
 printf 'zshrc\n' >"$tree/zsh/linux/.zshrc"
+printf 'tmux\n' >"$tree/tmux/.tmux.conf"
 printf 'gitconfig\n' >"$tree/git/.gitconfig"
 printf 'ignore\n' >"$tree/git/.gitignore_global"
 printf 'omp\n' >"$tree/ohmyposh/theme.omp.json"
@@ -202,6 +203,10 @@ printf '%s\n' "$err" | grep -q "replacing $home/.zshrc" || {
 }
 [ "$(cat "$home/.zshrc")" = zshrc ] || {
   echo 'install_dotfiles missed .zshrc' >&2
+  exit 1
+}
+[ "$(cat "$home/.tmux.conf")" = tmux ] || {
+  echo 'install_dotfiles missed .tmux.conf' >&2
   exit 1
 }
 [ "$(cat "$home/.gitconfig")" = gitconfig ] || {
@@ -249,6 +254,10 @@ case "$(uname -s)" in
 esac
 cmp -s "$real_root/zsh/$platform/.zshrc" "$real_home/.zshrc" || {
   echo "install_dotfiles missed real zsh/$platform/.zshrc" >&2
+  exit 1
+}
+cmp -s "$real_root/tmux/.tmux.conf" "$real_home/.tmux.conf" || {
+  echo 'install_dotfiles missed real tmux/.tmux.conf' >&2
   exit 1
 }
 for src in "$real_root/git"/* "$real_root/git"/.[!.]*; do
