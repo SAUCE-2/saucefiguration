@@ -288,7 +288,7 @@ done
 # again in every new shell.
 stubs="$work/stubs"
 mkdir -p "$stubs"
-for cmd in bash sh tr mktemp tar find mkdir mv chmod rm cp cmp dirname basename; do
+for cmd in bash sh tr mktemp tar find mkdir mv chmod rm cp cmp dirname basename awk date; do
   ln -s "$(command -v "$cmd")" "$stubs/$cmd"
 done
 cat >"$stubs/uname" <<'EOF'
