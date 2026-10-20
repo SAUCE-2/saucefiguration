@@ -2,7 +2,7 @@
 # Self-check for install.sh helpers. Sources the function half only.
 set -euo pipefail
 
-script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+script_dir=$(CDPATH='' cd -- "$(dirname "$0")" && pwd)
 # shellcheck source=install.sh
 SAUCE_LIB_ONLY=1 . "$script_dir/install.sh"
 
@@ -244,7 +244,7 @@ printf '%s\n' "$err" | grep -q "replacing $home/.zshrc" || {
 
 # Real clone: every file in git/, ssh/, ohmyposh/ must land in $HOME.
 # zsh/ is only the platform .zshrc; install.sh and tests stay in the clone.
-real_root=$(CDPATH= cd -- "$script_dir/.." && pwd)
+real_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
 real_home="$work/realhome"
 mkdir -p "$real_home"
 HOME="$real_home" SAUCE_ROOT="$real_root" install_dotfiles >/dev/null

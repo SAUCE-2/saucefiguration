@@ -4,7 +4,7 @@
 # commit we have not fetched is not a prompt. Y pulls when upstream is ahead.
 set -euo pipefail
 
-root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+root=$(CDPATH='' cd -- "$(dirname "$0")/.." && pwd)
 
 # Darwin still ships bash 3.2; ;& / ;;& are bash 4+.
 if grep -nE ';;?&' "$root/zsh/check-update.sh"; then

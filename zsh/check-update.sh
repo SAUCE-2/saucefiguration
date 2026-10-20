@@ -67,7 +67,7 @@ if ! git_c cat-file -e "$last_sha^{commit}" 2>/dev/null; then
 fi
 
 ranges="$last_sha..HEAD"
-if git_c rev-parse @{u} >/dev/null 2>&1; then
+if git_c rev-parse '@{u}' >/dev/null 2>&1; then
   ranges="$last_sha..HEAD $last_sha..@{u}"
 fi
 
@@ -93,8 +93,8 @@ echo
 files=$(
   {
     git_c --no-pager diff --name-only "$last_sha" HEAD
-    if git_c rev-parse @{u} >/dev/null 2>&1; then
-      git_c --no-pager diff --name-only "$last_sha" @{u}
+    if git_c rev-parse '@{u}' >/dev/null 2>&1; then
+      git_c --no-pager diff --name-only "$last_sha" '@{u}'
     fi
   } | sort -u
 )
@@ -124,11 +124,11 @@ case "$option" in
   y | Y | '')
     fetch_upstream >/dev/null 2>&1 || msg "fetch failed; installing what the clone already has"
     head=$(git_c rev-parse HEAD)
-    if up=$(git_c rev-parse @{u} 2>/dev/null) && [ "$head" != "$up" ]; then
+    if up=$(git_c rev-parse '@{u}' 2>/dev/null) && [ "$head" != "$up" ]; then
       # Merge the ref we just fetched: a pull would hit the network again (SSH)
       # and follow pull.rebase, which refuses a dirty tree.
       msg "git merge --ff-only @{u}"
-      if ! git_c merge --ff-only --quiet @{u}; then
+      if ! git_c merge --ff-only --quiet '@{u}'; then
         # Same 24h as "n". A dirty tree fails every new shell otherwise.
         echo $((now + 86400)) >"$state/snooze"
         msg "fast-forward failed; fix the clone then run: \`$repo/zsh/install.sh\`"
