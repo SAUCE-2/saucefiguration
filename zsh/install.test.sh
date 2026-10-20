@@ -6,6 +6,9 @@ script_dir=$(CDPATH='' cd -- "$(dirname "$0")" && pwd)
 # shellcheck source=install.sh
 SAUCE_LIB_ONLY=1 . "$script_dir/install.sh"
 
+# Octal permission bits, e.g. 600. GNU stat takes -c, BSD (macOS) stat -f.
+file_mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
+
 [ "$(pkg_name pacman openssh-client)" = openssh ] || {
   echo 'pkg_name pacman openssh-client' >&2
   exit 1
@@ -176,8 +179,8 @@ copy_file "$src" "$work/link.txt" 2>/dev/null
 
 mode_dest="$work/mode.txt"
 copy_file "$src" "$mode_dest" 600
-[ "$(stat -c %a "$mode_dest")" = 600 ] || {
-  echo "copy_file mode: $(stat -c %a "$mode_dest")" >&2
+[ "$(file_mode "$mode_dest")" = 600 ] || {
+  echo "copy_file mode: $(file_mode "$mode_dest")" >&2
   exit 1
 }
 
@@ -233,12 +236,12 @@ printf '%s\n' "$err" | grep -q "replacing $home/.zshrc" || {
   echo 'install_dotfiles missed allowed_signers' >&2
   exit 1
 }
-[ "$(stat -c %a "$home/.ssh")" = 700 ] || {
-  echo "ssh dir mode: $(stat -c %a "$home/.ssh")" >&2
+[ "$(file_mode "$home/.ssh")" = 700 ] || {
+  echo "ssh dir mode: $(file_mode "$home/.ssh")" >&2
   exit 1
 }
-[ "$(stat -c %a "$home/.ssh/config")" = 600 ] || {
-  echo "ssh config mode: $(stat -c %a "$home/.ssh/config")" >&2
+[ "$(file_mode "$home/.ssh/config")" = 600 ] || {
+  echo "ssh config mode: $(file_mode "$home/.ssh/config")" >&2
   exit 1
 }
 
