@@ -91,6 +91,20 @@ got=$(HOMEBREW_PREFIX="$work/brew" HOME="$work/home" find_plugin zsh-autosuggest
   exit 1
 }
 
+# fzf-tab's clone and Homebrew's pkgshare both put fzf-tab.zsh at the top.
+mkdir -p "$work/home/.local/share/fzf-tab"
+touch "$work/home/.local/share/fzf-tab/fzf-tab.zsh"
+got=$(HOMEBREW_PREFIX='' HOME="$work/home" find_plugin fzf-tab)
+[ "$got" = "$work/home/.local/share/fzf-tab/fzf-tab.zsh" ] || {
+  echo "find_plugin fzf-tab path: $got" >&2
+  exit 1
+}
+# Distro managers don't carry fzf-tab: skip them so install_user clones it.
+PM=pacman install_pkg fzf-tab && {
+  echo 'install_pkg fzf-tab should defer to install_user off Homebrew' >&2
+  exit 1
+}
+
 out=$(DRY_RUN=1 install_user eza)
 printf '%s\n' "$out" | grep -q 'would install eza into ~/.local' || {
   printf 'missing dry-run line\n%s\n' "$out" >&2
