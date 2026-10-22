@@ -360,6 +360,46 @@ printf '%s\n' "$out" | grep -q 'install_plugins' && {
   exit 1
 }
 
+# A real run with a tmux server already up, as when install.sh runs from a
+# shell inside tmux. That server never ran tpm, so it has no
+# TMUX_PLUGIN_MANAGER_PATH; tpm's install_plugins asks for it and aborts.
+# The stub tpm does what the real one does with that variable. Needs real
+# tmux (CI installs it); the dry runs above cannot catch this.
+if command -v tmux >/dev/null 2>&1; then
+  rh="$work/tmuxreal"
+  tpm_dir="$rh/.tmux/plugins/tpm"
+  mkdir -p "$tpm_dir/bin"
+  cp "$script_dir/../tmux/.tmux.conf" "$rh/.tmux.conf"
+  # shellcheck disable=SC2016
+  printf '#!/bin/sh\ntmux set-environment -g TMUX_PLUGIN_MANAGER_PATH "$HOME/.tmux/plugins/"\n' >"$tpm_dir/tpm"
+  # shellcheck disable=SC2016
+  printf '#!/bin/sh\ntmux start-server \\; show-environment -g TMUX_PLUGIN_MANAGER_PATH || exit 1\ntouch "$HOME/plugins-installed"\n' >"$tpm_dir/bin/install_plugins"
+  chmod +x "$tpm_dir/tpm" "$tpm_dir/bin/install_plugins"
+  # Short path: tmux socket paths are capped near 104 bytes.
+  usock=$(mktemp -d /tmp/sauce-test-tmux.XXXXXX)
+  HOME="$rh" TMUX_TMPDIR="$usock" tmux -f /dev/null new-session -d -s user
+  user_tmux="$usock/tmux-$(id -u)/default"
+  out=$(HOME="$rh" TMUX="$user_tmux,1,0" TMUX_TMPDIR="$usock" failed='' DRY_RUN=0 \
+    bash -c 'SAUCE_LIB_ONLY=1 . "$1"; install_tmux_plugins; [ -z "$failed" ]' _ "$script_dir/install.sh" 2>&1) || {
+    tmux -S "$user_tmux" kill-server 2>/dev/null || true
+    rm -rf "$usock"
+    printf 'tmux plugins failed with a tmux server already running\n%s\n' "$out" >&2
+    exit 1
+  }
+  user_alive=0
+  tmux -S "$user_tmux" has-session -t user 2>/dev/null && user_alive=1
+  tmux -S "$user_tmux" kill-server 2>/dev/null || true
+  rm -rf "$usock"
+  [ -e "$rh/plugins-installed" ] || {
+    printf 'tmux plugins: install_plugins did not run\n%s\n' "$out" >&2
+    exit 1
+  }
+  [ "$user_alive" = 1 ] || {
+    echo "tmux plugins killed the user's tmux server" >&2
+    exit 1
+  }
+fi
+
 # Full set of repo configs into a fake $HOME.
 tree="$work/repo"
 home="$work/home"

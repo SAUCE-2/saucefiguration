@@ -38,16 +38,22 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install zsh and shellcheck
+      # tmux: install.test.sh runs tpm's install step against a real server.
+      - name: Install zsh, shellcheck and tmux
         if: runner.os == 'Linux'
         run: |
           pkgs=()
           command -v zsh >/dev/null || pkgs+=(zsh)
           command -v shellcheck >/dev/null || pkgs+=(shellcheck)
+          command -v tmux >/dev/null || pkgs+=(tmux)
           if [ "${#pkgs[@]}" -gt 0 ]; then
             sudo apt-get update -qq
             sudo apt-get install -y -qq --no-install-recommends "${pkgs[@]}"
           fi
+
+      - name: Install tmux
+        if: runner.os == 'macOS'
+        run: command -v tmux >/dev/null || brew install tmux
 
       # Homebrew's bash comes first on the runner's PATH, and
       # check-update.test.sh runs `bash check-update.sh` through PATH.
@@ -62,6 +68,7 @@ jobs:
         run: |
           ${{ matrix.bash }} --version
           zsh --version
+          tmux -V
           if [ "$RUNNER_OS" = Linux ]; then shellcheck --version; fi
           # The tests also call `bash` through PATH; it must be the same one.
           want=$(${{ matrix.bash }} --version | sed -n 1p)

@@ -624,8 +624,14 @@ install_webi() {
 # tpm plus the plugins tmux/.tmux.conf declares (resurrect, continuum). Runs
 # after install_dotfiles: install_plugins reads the @plugin list from
 # ~/.tmux.conf.
+#
+# install_plugins asks the tmux server for TMUX_PLUGIN_MANAGER_PATH, which
+# only a server that ran tpm from its config has. A server already running
+# (started before tpm was cloned, or the one this shell is in) lacks it and
+# install_plugins aborts. So point it at a private socket dir: its
+# `start-server` then starts a fresh server that sources ~/.tmux.conf.
 install_tmux_plugins() {
-  local tpm="$HOME/.tmux/plugins/tpm"
+  local tpm="$HOME/.tmux/plugins/tpm" sock rc=0
   if ! have tmux; then
     warn "no tmux; skipping tmux plugins"
     return 0
@@ -637,7 +643,19 @@ install_tmux_plugins() {
       return 0
     }
   fi
-  run "$tpm/bin/install_plugins" || fail "tmux plugin install"
+  if [ "${DRY_RUN:-0}" = 1 ]; then
+    run "$tpm/bin/install_plugins"
+    return 0
+  fi
+  # /tmp, not $TMPDIR: macOS's is long and sockets are capped near 104 bytes.
+  sock=$(mktemp -d /tmp/saucefiguration-tmux.XXXXXX) || {
+    fail "tmux plugin install"
+    return 0
+  }
+  TMUX='' TMUX_TMPDIR="$sock" "$tpm/bin/install_plugins" || rc=$?
+  TMUX='' TMUX_TMPDIR="$sock" tmux kill-server >/dev/null 2>&1 || true
+  rm -rf "$sock"
+  [ "$rc" = 0 ] || fail "tmux plugin install"
 }
 
 # install.test.sh sources this file for the functions above and nothing else.
