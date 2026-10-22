@@ -82,7 +82,7 @@ jobs:
 
       - name: shellcheck
         if: ${{ !cancelled() && runner.os == 'Linux' }}
-        run: shellcheck zsh/*.sh
+        run: shellcheck zsh/*.sh .github/*.sh
 
       - name: zsh -n
         if: ${{ !cancelled() }}

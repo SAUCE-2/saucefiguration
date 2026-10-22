@@ -19,6 +19,9 @@ offers to pull and re-run it when the clone gets new commits.
 - `ohmyposh/` -> `~/.config/ohmyposh/`: prompt theme.
 - `direnv/` -> `~/.config/direnv/`.
 - `tmux/.tmux.conf` -> `~/.tmux.conf`.
+- `.github/`: CI, PR title check and labels, Dependabot, stale `claude/*`
+  branch pruning. `settings.sh` applies the repo settings and `main` ruleset
+  (squash only, auto-delete branches, CI required); the user runs it by hand.
 
 `install.sh` copies whole directories, so a new file in `git/`, `ssh/`,
 `ohmyposh/` or `direnv/` ships on its own. A new config directory needs a
@@ -43,7 +46,7 @@ up as `<file>.bak.<time>` before it is replaced.
 ```bash
 bash zsh/install.test.sh
 bash zsh/check-update.test.sh
-shellcheck zsh/*.sh
+shellcheck zsh/*.sh .github/*.sh
 zsh -n zsh/linux/.zshrc zsh/darwin/.zshrc
 ```
 
@@ -53,3 +56,5 @@ under macOS's `/bin/bash` 3.2.
 ## Commits
 
 Conventional commits scoped by directory: `feat(zsh): ...`, `fix(git): ...`.
+PRs are squash-merged with the PR title as the commit, so the title must be
+one too; the `pr title` check enforces it. Changes to `main` go through a PR.

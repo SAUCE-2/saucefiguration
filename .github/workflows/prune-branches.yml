@@ -1,0 +1,45 @@
+# Agent sessions leave claude/* branches behind when they never open a PR
+# or the PR is closed unmerged (merged ones are deleted on merge). This
+# deletes those with no open PR and no commit for 14 days. Each deleted
+# branch's tip SHA is logged, so one can be restored with
+#   git push origin <sha>:refs/heads/<branch>
+name: Prune branches
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: List the branches without deleting them
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      DRY_RUN: ${{ inputs.dry-run || false }}
+    steps:
+      - name: Delete stale claude/* branches
+        run: |
+          cutoff=$(date -u -d '14 days ago' +%s)
+          gh api --paginate "repos/$REPO/branches?per_page=100" \
+            --jq '.[] | select(.name | startswith("claude/")) | [.name, .commit.sha] | @tsv' |
+            while IFS=$'\t' read -r branch sha; do
+              open=$(gh pr list --repo "$REPO" --head "$branch" --state open --json number --jq length)
+              [ "$open" = 0 ] || continue
+              date=$(gh api "repos/$REPO/commits/$sha" --jq .commit.committer.date)
+              [ "$(date -u -d "$date" +%s)" -lt "$cutoff" ] || continue
+              echo "$branch $sha (last commit $date)"
+              if [ "$DRY_RUN" != true ]; then
+                gh api -X DELETE "repos/$REPO/git/refs/heads/$branch" --silent
+              fi
+            done

@@ -1,0 +1,25 @@
+# One label per top-level directory, applied by .github/workflows/pr.yml.
+zsh:
+  - changed-files:
+      - any-glob-to-any-file: zsh/**
+git:
+  - changed-files:
+      - any-glob-to-any-file: git/**
+ssh:
+  - changed-files:
+      - any-glob-to-any-file: ssh/**
+tmux:
+  - changed-files:
+      - any-glob-to-any-file: tmux/**
+ohmyposh:
+  - changed-files:
+      - any-glob-to-any-file: ohmyposh/**
+direnv:
+  - changed-files:
+      - any-glob-to-any-file: direnv/**
+github:
+  - changed-files:
+      - any-glob-to-any-file: .github/**
+claude:
+  - changed-files:
+      - any-glob-to-any-file: [CLAUDE.md, .claude/**]
