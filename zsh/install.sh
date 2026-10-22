@@ -623,7 +623,7 @@ if [ -s "$NVM_DIR/nvm.sh" ]; then
   log "nvm already installed"
 else
   log "Installing nvm into ~/.nvm"
-  # PROFILE=/dev/null: the .zshrc in this repo already sources nvm.sh.
+  # PROFILE=/dev/null: the .zshrc in this repo already loads nvm.
   run bash -c 'curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | PROFILE=/dev/null bash' ||
     fail "nvm install"
 fi

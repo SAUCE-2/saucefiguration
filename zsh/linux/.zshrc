@@ -48,6 +48,38 @@ zstyle ':omz:plugins:alias-finder' cheaper yes
 zstyle :omz:plugins:ssh-agent lazy yes
 zstyle :omz:plugins:ssh-agent quiet yes
 
+# Node version management (nvm, installed by install.sh). Sourcing nvm.sh
+# costs a few hundred ms, so put the default Node's bin on PATH by hand and
+# load nvm on its first call. Before oh-my-zsh.sh so the npm plugin sees npm.
+# Follows alias chains like default -> lts/* -> lts/krypton -> v24.22.1 and
+# takes the newest installed match, as nvm does; no subprocesses.
+export NVM_DIR="$HOME/.nvm"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  () {
+    local v dirs n
+    [ -r "$NVM_DIR/alias/default" ] && v=$(<"$NVM_DIR/alias/default")
+    for n in 1 2 3 4 5; do
+      [[ -n $v && -f $NVM_DIR/alias/$v ]] || break
+      v=$(<"$NVM_DIR/alias/$v")
+    done
+    v=${v#v}
+    if [[ $v == (node|stable) ]]; then
+      dirs=("$NVM_DIR"/versions/node/v*(N/nOn))
+    elif [[ $v == <->(|.<->)(|.<->) ]]; then
+      dirs=("$NVM_DIR"/versions/node/v$v(|.*)(N/nOn))
+    fi
+    (( $#dirs )) && path=("$dirs[1]/bin" $path)
+  }
+
+  # The inner anonymous function keeps nvm's arguments out of nvm.sh's $@.
+  nvm() {
+    unset -f nvm
+    () { . "$NVM_DIR/nvm.sh" }
+    [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
+    nvm "$@"
+  }
+fi
+
 source "$ZSH/oh-my-zsh.sh"
 
 # git signs commits with ssh-keygen, which never adds the key to the agent, so
@@ -71,11 +103,6 @@ setopt SHARE_HISTORY
 setopt HIST_IGNORE_DUPS
 setopt HIST_EXPIRE_DUPS_FIRST
 setopt HIST_FIND_NO_DUPS
-
-# Node version management (nvm, installed by install.sh).
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
 
 # Cloudflare CLI completion, written by install.sh. Tab still runs `cf`.
 [ -f "$HOME/.config/cf/complete.zsh" ] && . "$HOME/.config/cf/complete.zsh"
