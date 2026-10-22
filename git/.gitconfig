@@ -20,6 +20,12 @@
 	ff = true
 	conflictstyle = zdiff3
 
+# Read by delta (git-delta). No core.pager here: the .zshrc sets
+# GIT_PAGER=delta only where delta is installed, so git elsewhere keeps less.
+[delta]
+	navigate = true
+	line-numbers = true
+
 [rerere]
 	enabled = true
 

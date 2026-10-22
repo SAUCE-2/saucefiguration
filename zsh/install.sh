@@ -32,6 +32,7 @@ packages="
   fzf:fzf
   zoxide:zoxide
   lazygit:lazygit
+  git-delta:delta
   tmux:tmux
   zsh-autosuggestions:
   zsh-syntax-highlighting:
@@ -90,6 +91,7 @@ pkg_name() {
     pacman:openssh-client | zypper:openssh-client) echo openssh ;;
     apt-get:go) echo golang-go ;;
     dnf:go) echo golang ;;
+    apk:git-delta) echo delta ;;
     *) echo "$2" ;;
   esac
 }
@@ -253,6 +255,15 @@ install_user() {
       goarch=$cpu
       [ "$cpu" = aarch64 ] && goarch=arm64
       install_gh_tar "https://github.com/jesseduffield/lazygit/releases/download/${tag}/lazygit_${ver}_linux_${goarch}.tar.gz" lazygit
+      ;;
+    git-delta)
+      # Tags have no v prefix. Only x86_64 has a musl build.
+      tag=$(github_latest_tag dandavison/delta) || return 1
+      if [ "$cpu" = x86_64 ]; then
+        install_gh_tar "https://github.com/dandavison/delta/releases/download/${tag}/delta-${tag}-x86_64-unknown-linux-musl.tar.gz" delta
+      else
+        install_gh_tar "https://github.com/dandavison/delta/releases/download/${tag}/delta-${tag}-aarch64-unknown-linux-gnu.tar.gz" delta
+      fi
       ;;
     *) return 1 ;;
   esac
