@@ -37,6 +37,13 @@ packages="
   zsh-syntax-highlighting:
 "
 
+# Same format. Joins packages only under WSL (see is_wsl), so other systems
+# neither install nor verify them. wslu provides wslview, which the linux
+# .zshrc uses as $BROWSER.
+wsl_packages="
+  wslu:wslview
+"
+
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33mskip:\033[0m %s\n' "$*" >&2; }
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -131,6 +138,19 @@ find_plugin() {
       return 0
     fi
   done
+  return 1
+}
+
+# True inside WSL 1 or 2. WSL_DISTRO_NAME is gone under sudo or env -i, so
+# also look for the interop handler and the kernel release string.
+# SAUCE_WSL_INTEROP is for tests.
+is_wsl() {
+  [ "$(uname -s)" = Linux ] || return 1
+  [ -n "${WSL_DISTRO_NAME:-}" ] && return 0
+  [ -e "${SAUCE_WSL_INTEROP:-/proc/sys/fs/binfmt_misc/WSLInterop}" ] && return 0
+  case "$(uname -r)" in
+    *[Mm]icrosoft* | *WSL*) return 0 ;;
+  esac
   return 1
 }
 
@@ -524,6 +544,11 @@ if [ -z "$PM" ]; then
   exit 1
 fi
 log "Using $PM on $(uname -s) $(uname -m)"
+
+if is_wsl; then
+  log "WSL detected; adding WSL-only packages"
+  packages="$packages$wsl_packages"
+fi
 
 PM_WRITE=1
 if ! pm_can_write "$PM"; then

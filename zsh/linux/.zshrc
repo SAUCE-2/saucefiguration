@@ -123,6 +123,14 @@ fi
 (( $+commands[rg] )) && alias grep='rg'
 (( $+commands[lazygit] )) && alias lg='lazygit'
 
+# WSL (wslu): open URLs and files in the Windows default browser or app.
+# BROWSER covers gh, xdg-open, Python's webbrowser and friends. `open` is
+# macOS muscle memory, aliased only where no real `open` exists.
+if (( $+commands[wslview] )); then
+  export BROWSER=wslview
+  (( $+commands[open] )) || alias open='wslview'
+fi
+
 # Bootdev submit.
 alias bdev='yes | bootdev run -s'
 
