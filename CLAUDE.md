@@ -10,6 +10,9 @@ symlinked. The user copies them into place by hand.
 - `ssh/`: client config, `authorized_keys` and `allowed_signers`. Public keys only.
 - `ohmyposh/theme.omp.json`: prompt theme.
 - `tmux/.tmux.conf`: tmux config, copied to `~/.tmux.conf`.
+- `.github/`: CI, PR title check and labels, Dependabot, stale `claude/*`
+  branch pruning. `settings.sh` applies the repo settings and `main` ruleset
+  (squash only, auto-delete branches, CI required); the user runs it by hand.
 
 ## Rules
 
@@ -28,7 +31,7 @@ symlinked. The user copies them into place by hand.
 ```bash
 bash zsh/install.test.sh
 bash zsh/check-update.test.sh
-shellcheck zsh/*.sh
+shellcheck zsh/*.sh .github/*.sh
 zsh -n zsh/linux/.zshrc zsh/darwin/.zshrc
 ```
 
@@ -38,3 +41,5 @@ under macOS's `/bin/bash` 3.2.
 ## Commits
 
 Conventional commits scoped by directory: `feat(zsh): ...`, `fix(git): ...`.
+PRs are squash-merged with the PR title as the commit, so the title must be
+one too; the `pr title` check enforces it. Changes to `main` go through a PR.
