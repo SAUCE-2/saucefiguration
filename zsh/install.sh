@@ -189,13 +189,16 @@ is_wsl() {
 }
 
 # True when $1's mount is read-only. No findmnt => assume writable.
+# SteamOS mounts / rw and makes the btrfs subvolume read-only instead
+# (steamos-readonly), so ask btrfs too.
 fs_readonly() {
-  local opts
+  local opts target
   opts=$(findmnt -n -o OPTIONS -T "$1" 2>/dev/null) || return 1
   case ",$opts," in
     *,ro,*) return 0 ;;
-    *) return 1 ;;
   esac
+  target=$(findmnt -n -o TARGET -T "$1" 2>/dev/null) || return 1
+  [ "$(btrfs property get -ts "$target" ro 2>/dev/null)" = ro=true ]
 }
 
 # Homebrew writes to its prefix. Distro managers need a writable package db.

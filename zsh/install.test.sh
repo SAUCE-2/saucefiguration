@@ -140,6 +140,21 @@ PATH="$work:$PATH" pm_can_write pacman || {
   exit 1
 }
 
+# SteamOS: the mount says rw, but steamos-readonly flips the btrfs subvolume.
+printf '%s\n' '#!/bin/sh' 'case "$*" in *TARGET*) echo / ;; *) echo rw,relatime ;; esac' >"$work/findmnt"
+printf '%s\n' '#!/bin/sh' '[ "$*" = "property get -ts / ro" ] && echo ro=true' >"$work/btrfs"
+chmod +x "$work/btrfs"
+PATH="$work:$PATH" fs_readonly /var/lib/pacman || {
+  echo 'expected read-only btrfs subvolume' >&2
+  exit 1
+}
+printf '%s\n' '#!/bin/sh' 'echo ro=false' >"$work/btrfs"
+PATH="$work:$PATH" fs_readonly /var/lib/pacman && {
+  echo 'expected writable btrfs subvolume' >&2
+  exit 1
+}
+rm "$work/btrfs"
+
 pm_can_write brew || {
   echo 'brew should always look writable' >&2
   exit 1
