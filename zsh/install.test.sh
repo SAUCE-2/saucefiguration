@@ -57,6 +57,40 @@ done
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
+# is_wsl: a fake uname answers -s with $FAKE_S and -r with $FAKE_R.
+mkdir -p "$work/wsl"
+cat >"$work/wsl/uname" <<'EOF'
+#!/bin/sh
+case "$1" in -r) echo "$FAKE_R" ;; *) echo "$FAKE_S" ;; esac
+EOF
+chmod +x "$work/wsl/uname"
+wsl_case() { # expect(0|1) uname-s uname-r WSL_DISTRO_NAME interop-file
+  local got=0
+  PATH="$work/wsl:$PATH" FAKE_S=$2 FAKE_R=$3 WSL_DISTRO_NAME=$4 SAUCE_WSL_INTEROP=$5 is_wsl || got=1
+  [ "$got" = "$1" ] || {
+    echo "is_wsl -s '$2' -r '$3' distro '$4' interop '$5': want $1, got $got" >&2
+    exit 1
+  }
+}
+touch "$work/wsl/WSLInterop"
+wsl_case 1 Linux 6.8.0-45-generic '' "$work/wsl/none"
+wsl_case 1 Darwin 23.6.0 Ubuntu "$work/wsl/WSLInterop"
+wsl_case 0 Linux 6.6.87.2-microsoft-standard-WSL2 '' "$work/wsl/none"
+wsl_case 0 Linux 4.4.0-19041-Microsoft '' "$work/wsl/none"
+wsl_case 0 Linux 6.8.0-45-generic Ubuntu "$work/wsl/none"
+wsl_case 0 Linux 6.8.0-45-generic '' "$work/wsl/WSLInterop"
+# Only the WSL list carries wslu.
+case "$packages" in *wslu*)
+  echo 'wslu belongs in wsl_packages, not packages' >&2
+  exit 1
+  ;;
+esac
+case "$wsl_packages" in *wslu:wslview*) ;; *)
+  echo 'wsl_packages lost wslu:wslview' >&2
+  exit 1
+  ;;
+esac
+
 printf '%s\n' '#!/bin/sh' 'echo ro,relatime' >"$work/findmnt"
 chmod +x "$work/findmnt"
 PATH="$work:$PATH" fs_readonly /var/lib/pacman || {
@@ -446,7 +480,7 @@ fail_home="$work/failhome"
 mkdir -p "$fail_home"
 status=0
 out=$(env -i HOME="$fail_home" PATH="$stubs" SAUCE_ROOT="$tree" SAUCE_STATE_DIR="$work/failstate" \
-  "$BASH" "$script_dir/install.sh" 2>&1) || status=$?
+  SAUCE_WSL_INTEROP="$work/wsl/none" "$BASH" "$script_dir/install.sh" 2>&1) || status=$?
 [ "$status" = 1 ] || {
   printf 'failed install should exit 1, got %s\n%s\n' "$status" "$out" >&2
   exit 1
@@ -466,6 +500,11 @@ printf '%s\n' "$out" | grep -q 'apt-get update, Oh My Zsh install, nvm install, 
 # No sudo still falls back to ~/.local.
 printf '%s\n' "$out" | grep -q 'Installing eza into ~/.local/bin' || {
   printf 'no ~/.local fallback without sudo\n%s\n' "$out" >&2
+  exit 1
+}
+# Plain Linux: WSL-only packages are neither tried nor reported missing.
+printf '%s\n' "$out" | grep -q 'wslu\|WSL' && {
+  printf 'plain Linux run mentioned WSL packages\n%s\n' "$out" >&2
   exit 1
 }
 
