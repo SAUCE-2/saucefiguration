@@ -2,8 +2,9 @@
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME=""
 
-# User-installed tools, including Oh My Posh and `go install` binaries.
-export PATH="$HOME/.local/bin:$HOME/go/bin:$PATH"
+# User-installed tools, including Oh My Posh, Go from go.dev (~/.local/go)
+# and `go install` binaries.
+export PATH="$HOME/.local/bin:$HOME/.local/go/bin:$HOME/go/bin:$PATH"
 
 # Prevent duplicate PATH and completion entries.
 typeset -U path fpath
