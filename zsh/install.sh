@@ -37,6 +37,7 @@ packages="
   lazygit:lazygit
   git-delta:delta
   tmux:tmux
+  micro:micro
   gh:gh
   zsh-autosuggestions:
   zsh-syntax-highlighting:
@@ -100,6 +101,7 @@ pkg_name() {
     pacman:command-not-found) echo pkgfile ;;
     dnf:openssh-client) echo openssh-clients ;;
     pacman:openssh-client | zypper:openssh-client) echo openssh ;;
+    zypper:micro) echo micro-editor ;;
     pacman:gh | apk:gh) echo github-cli ;;
     apt-get:go) echo golang-go ;;
     dnf:go) echo golang ;;
@@ -327,6 +329,13 @@ install_user() {
       goarch=$cpu
       [ "$cpu" = aarch64 ] && goarch=arm64
       install_gh_tar "https://github.com/jesseduffield/lazygit/releases/download/${tag}/lazygit_${ver}_linux_${goarch}.tar.gz" lazygit
+      ;;
+    micro)
+      tag=$(github_latest_tag micro-editor/micro) || return 1
+      ver=${tag#v}
+      farch=linux64-static
+      [ "$cpu" = aarch64 ] && farch=linux-arm64
+      install_gh_tar "https://github.com/micro-editor/micro/releases/download/${tag}/micro-${ver}-${farch}.tar.gz" micro
       ;;
     git-delta)
       # Tags have no v prefix. Only x86_64 has a musl build.

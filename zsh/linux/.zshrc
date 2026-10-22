@@ -111,6 +111,15 @@ if (( $+commands[zoxide] )); then
   eval "$(zoxide init --cmd cd zsh)"
 fi
 
+# Editor for git commit, crontab -e and the rest. git falls through to
+# $VISUAL/$EDITOR because .gitconfig sets no core.editor. micro is optional.
+if (( $+commands[micro] )); then
+  export EDITOR=micro
+else
+  export EDITOR=nano
+fi
+export VISUAL=$EDITOR
+
 # Per-directory env: loads a project's .envrc (or .env, see
 # direnv/direnv.toml) after `direnv allow`, unloads it on the way out.
 # Replaces omz's dotenv plugin. A plain hook rather than omz's direnv plugin,

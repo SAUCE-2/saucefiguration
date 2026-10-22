@@ -25,6 +25,10 @@ file_mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
   echo 'pkg_name dnf go' >&2
   exit 1
 }
+[ "$(pkg_name zypper micro)" = micro-editor ] || {
+  echo 'pkg_name zypper micro' >&2
+  exit 1
+}
 for pm in pacman apk; do
   [ "$(pkg_name "$pm" gh)" = github-cli ] || {
     echo "pkg_name $pm gh" >&2
