@@ -69,7 +69,7 @@ git() {
 }
 
 # macOS uses Ctrl+S as XOFF, which freezes the terminal. Turn that off
-# so GNU nano receives it as Save. Apple's /usr/bin/nano is Pico and ignores it.
+# so micro and GNU nano receive it as Save. Apple's /usr/bin/nano is Pico and ignores it.
 # Terminal only: under IntelliJ's `zsh -l -i -c ...` stty has none and errors.
 if [[ -t 0 ]]; then
   stty -ixon
@@ -98,6 +98,15 @@ export NVM_DIR="$HOME/.nvm"
 if (( $+commands[zoxide] )); then
   eval "$(zoxide init --cmd cd zsh)"
 fi
+
+# Editor for git commit, crontab -e and the rest. git falls through to
+# $VISUAL/$EDITOR because .gitconfig sets no core.editor. micro is optional.
+if (( $+commands[micro] )); then
+  export EDITOR=micro
+else
+  export EDITOR=nano
+fi
+export VISUAL=$EDITOR
 
 # Fuzzy history search with Ctrl+R and file search with Ctrl+T.
 if (( $+commands[fzf] )); then

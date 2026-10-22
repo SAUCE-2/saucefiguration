@@ -25,6 +25,10 @@ file_mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
   echo 'pkg_name dnf go' >&2
   exit 1
 }
+[ "$(pkg_name zypper micro)" = micro-editor ] || {
+  echo 'pkg_name zypper micro' >&2
+  exit 1
+}
 for v in go1.24.2 go1.24 go1.25.3 go2.0; do
   go_version_ok "$v" || {
     echo "go_version_ok $v should pass" >&2

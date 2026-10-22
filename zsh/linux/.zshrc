@@ -83,6 +83,15 @@ if (( $+commands[zoxide] )); then
   eval "$(zoxide init --cmd cd zsh)"
 fi
 
+# Editor for git commit, crontab -e and the rest. git falls through to
+# $VISUAL/$EDITOR because .gitconfig sets no core.editor. micro is optional.
+if (( $+commands[micro] )); then
+  export EDITOR=micro
+else
+  export EDITOR=nano
+fi
+export VISUAL=$EDITOR
+
 # Fuzzy history search with Ctrl+R and file search with Ctrl+T.
 # `fzf --zsh` needs fzf 0.48+; older distro packages ship the scripts on disk.
 if (( $+commands[fzf] )); then
