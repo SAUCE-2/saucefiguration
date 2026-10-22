@@ -93,9 +93,10 @@ export NVM_DIR="$HOME/.nvm"
 # Cloudflare CLI completion, written by install.sh. Tab still runs `cf`.
 [ -f "$HOME/.config/cf/complete.zsh" ] && . "$HOME/.config/cf/complete.zsh"
 
-# Better directory jumping: `z partial-directory-name`.
+# Better directory jumping: `cd partial-directory-name`, `cdi` to pick with fzf.
+# omz's zoxide plugin still sets up `z` and `zi`.
 if (( $+commands[zoxide] )); then
-  eval "$(zoxide init zsh)"
+  eval "$(zoxide init --cmd cd zsh)"
 fi
 
 # Fuzzy history search with Ctrl+R and file search with Ctrl+T.
