@@ -25,7 +25,6 @@ plugins=(
   eza
   fzf
   git
-  git-auto-fetch
   git-commit
   gitfast
   macos

@@ -43,7 +43,7 @@
 
 [fetch]
 	prune = true
-	# No pruneTags: it deletes unpushed local tags on every fetch, git-auto-fetch included.
+	# No pruneTags: it deletes unpushed local tags on every fetch.
 
 [commit]
 	gpgsign = true
