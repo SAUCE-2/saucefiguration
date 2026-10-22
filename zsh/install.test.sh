@@ -230,13 +230,14 @@ copy_file "$src" "$mode_dest" 600
 # Full set of repo configs into a fake $HOME.
 tree="$work/repo"
 home="$work/home"
-mkdir -p "$tree/zsh/linux" "$tree/zsh/darwin" "$tree/tmux" "$tree/git" "$tree/ohmyposh" "$tree/ssh"
+mkdir -p "$tree/zsh/linux" "$tree/zsh/darwin" "$tree/tmux" "$tree/git" "$tree/ohmyposh" "$tree/direnv" "$tree/ssh"
 printf 'zshrc\n' >"$tree/zsh/linux/.zshrc"
 printf 'zshrc\n' >"$tree/zsh/darwin/.zshrc"
 printf 'tmux\n' >"$tree/tmux/.tmux.conf"
 printf 'gitconfig\n' >"$tree/git/.gitconfig"
 printf 'ignore\n' >"$tree/git/.gitignore_global"
 printf 'omp\n' >"$tree/ohmyposh/theme.omp.json"
+printf 'direnv\n' >"$tree/direnv/direnv.toml"
 printf 'sshconfig\n' >"$tree/ssh/config"
 printf 'keys\n' >"$tree/ssh/authorized_keys"
 printf 'signers\n' >"$tree/ssh/allowed_signers"
@@ -266,6 +267,10 @@ printf '%s\n' "$err" | grep -q "replacing $home/.zshrc" || {
 }
 [ "$(cat "$home/.config/ohmyposh/theme.omp.json")" = omp ] || {
   echo 'install_dotfiles missed ohmyposh theme' >&2
+  exit 1
+}
+[ "$(cat "$home/.config/direnv/direnv.toml")" = direnv ] || {
+  echo 'install_dotfiles missed direnv config' >&2
   exit 1
 }
 [ "$(cat "$home/.ssh/config")" = sshconfig ] || {
@@ -336,7 +341,7 @@ printf '%s\n' "$err" | grep -q 'replacing' && {
   exit 1
 }
 
-# Real clone: every file in git/, ssh/, ohmyposh/ must land in $HOME.
+# Real clone: every file in git/, ssh/, ohmyposh/, direnv/ must land in $HOME.
 # zsh/ is only the platform .zshrc; install.sh and tests stay in the clone.
 real_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
 real_home="$work/realhome"
@@ -365,6 +370,13 @@ for src in "$real_root/ohmyposh"/* "$real_root/ohmyposh"/.[!.]*; do
   [ -f "$src" ] || continue
   cmp -s "$src" "$real_home/.config/ohmyposh/$(basename "$src")" || {
     echo "install_dotfiles missed real ohmyposh/$(basename "$src")" >&2
+    exit 1
+  }
+done
+for src in "$real_root/direnv"/* "$real_root/direnv"/.[!.]*; do
+  [ -f "$src" ] || continue
+  cmp -s "$src" "$real_home/.config/direnv/$(basename "$src")" || {
+    echo "install_dotfiles missed real direnv/$(basename "$src")" >&2
     exit 1
   }
 done

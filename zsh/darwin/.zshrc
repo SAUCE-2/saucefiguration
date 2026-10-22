@@ -21,7 +21,6 @@ plugins=(
   alias-finder
   brew
   command-not-found
-  dotenv
   eza
   fzf
   git
@@ -97,6 +96,15 @@ export NVM_DIR="$HOME/.nvm"
 # omz's zoxide plugin still sets up `z` and `zi`.
 if (( $+commands[zoxide] )); then
   eval "$(zoxide init --cmd cd zsh)"
+fi
+
+# Per-directory env: loads a project's .envrc (or .env, see
+# direnv/direnv.toml) after `direnv allow`, unloads it on the way out.
+# Replaces omz's dotenv plugin. A plain hook rather than omz's direnv plugin,
+# matching zoxide above. Its default "direnv: loading" / "export +VAR" lines
+# stay on: they show which variables a cd just changed.
+if (( $+commands[direnv] )); then
+  eval "$(direnv hook zsh)"
 fi
 
 # Fuzzy history search with Ctrl+R and file search with Ctrl+T.

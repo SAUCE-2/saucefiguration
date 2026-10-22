@@ -31,6 +31,7 @@ packages="
   ripgrep:rg
   fzf:fzf
   zoxide:zoxide
+  direnv:direnv
   lazygit:lazygit
   tmux:tmux
   zsh-autosuggestions:
@@ -247,6 +248,18 @@ install_user() {
     zoxide)
       curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
       ;;
+    direnv)
+      # Released as a bare static binary, not a tarball.
+      goarch=amd64
+      [ "$cpu" = aarch64 ] && goarch=arm64
+      curl -fsSL -o "$HOME/.local/bin/direnv.tmp.$$" \
+        "https://github.com/direnv/direnv/releases/latest/download/direnv.linux-${goarch}" || {
+        rm -f "$HOME/.local/bin/direnv.tmp.$$"
+        return 1
+      }
+      chmod +x "$HOME/.local/bin/direnv.tmp.$$"
+      mv -f "$HOME/.local/bin/direnv.tmp.$$" "$HOME/.local/bin/direnv"
+      ;;
     lazygit)
       tag=$(github_latest_tag jesseduffield/lazygit) || return 1
       ver=${tag#v}
@@ -403,6 +416,10 @@ install_dotfiles() {
   for src in "$root/ohmyposh"/* "$root/ohmyposh"/.[!.]*; do
     [ -f "$src" ] || continue
     copy_file "$src" "$HOME/.config/ohmyposh/$(basename "$src")"
+  done
+  for src in "$root/direnv"/* "$root/direnv"/.[!.]*; do
+    [ -f "$src" ] || continue
+    copy_file "$src" "$HOME/.config/direnv/$(basename "$src")"
   done
 
   if [ "${DRY_RUN:-0}" != 1 ]; then
