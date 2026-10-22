@@ -49,6 +49,22 @@ for v in go1.19.8 go1.23.4 go1.9 devel garbage; do
     exit 1
   }
 done
+[ -z "$(pkg_name apt-get yq)" ] || {
+  echo 'pkg_name apt-get yq should be empty (Debian yq is the Python one)' >&2
+  exit 1
+}
+[ "$(pkg_name pacman yq)" = go-yq ] || {
+  echo 'pkg_name pacman yq' >&2
+  exit 1
+}
+[ "$(pkg_name apk yq)" = yq-go ] || {
+  echo 'pkg_name apk yq' >&2
+  exit 1
+}
+DRY_RUN=1 PM=apt-get install_pkg yq && {
+  echo 'install_pkg yq should refuse on apt-get' >&2
+  exit 1
+}
 [ "$(pkg_name pacman eza)" = eza ] || {
   echo 'pkg_name passthrough' >&2
   exit 1
@@ -148,6 +164,19 @@ got=$(HOMEBREW_PREFIX='' HOME="$work/home" find_plugin fzf-tab)
 # Distro managers don't carry fzf-tab: skip them so install_user clones it.
 PM=pacman install_pkg fzf-tab && {
   echo 'install_pkg fzf-tab should defer to install_user off Homebrew' >&2
+  exit 1
+}
+
+mkdir -p "$work/yqpy" "$work/yqgo"
+printf '#!/bin/sh\necho yq 3.4.3\n' >"$work/yqpy/yq"
+printf '#!/bin/sh\necho "yq (https://github.com/mikefarah/yq/) version v4.45.1"\n' >"$work/yqgo/yq"
+chmod +x "$work/yqpy/yq" "$work/yqgo/yq"
+PATH="$work/yqpy:/usr/bin:/bin" have_tool yq && {
+  echo 'have_tool should reject the Python yq' >&2
+  exit 1
+}
+PATH="$work/yqgo:/usr/bin:/bin" have_tool yq || {
+  echo "have_tool should accept mikefarah's yq" >&2
   exit 1
 }
 
