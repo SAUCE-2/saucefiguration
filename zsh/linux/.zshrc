@@ -14,11 +14,9 @@ plugins=(
   alias-finder
   brew
   command-not-found
-  dotenv
   eza
   fzf
   git
-  git-auto-fetch
   git-commit
   gitfast
   node
@@ -33,6 +31,9 @@ plugins=(
 # omz's tmux plugin prints an error at every start if tmux is missing.
 (( $+commands[tmux] )) && plugins+=(tmux)
 
+# omz's gh plugin builds its completions by running gh, so it needs gh.
+(( $+commands[gh] )) && plugins+=(gh)
+
 # After each command, print any shorter alias you could have used instead.
 zstyle ':omz:plugins:alias-finder' autoload yes
 zstyle ':omz:plugins:alias-finder' cheaper yes
@@ -44,6 +45,38 @@ zstyle ':omz:plugins:alias-finder' cheaper yes
 # These zstyles must be set before oh-my-zsh.sh sources the plugin.
 zstyle :omz:plugins:ssh-agent lazy yes
 zstyle :omz:plugins:ssh-agent quiet yes
+
+# Node version management (nvm, installed by install.sh). Sourcing nvm.sh
+# costs a few hundred ms, so put the default Node's bin on PATH by hand and
+# load nvm on its first call. Before oh-my-zsh.sh so the npm plugin sees npm.
+# Follows alias chains like default -> lts/* -> lts/krypton -> v24.22.1 and
+# takes the newest installed match, as nvm does; no subprocesses.
+export NVM_DIR="$HOME/.nvm"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  () {
+    local v dirs n
+    [ -r "$NVM_DIR/alias/default" ] && v=$(<"$NVM_DIR/alias/default")
+    for n in 1 2 3 4 5; do
+      [[ -n $v && -f $NVM_DIR/alias/$v ]] || break
+      v=$(<"$NVM_DIR/alias/$v")
+    done
+    v=${v#v}
+    if [[ $v == (node|stable) ]]; then
+      dirs=("$NVM_DIR"/versions/node/v*(N/nOn))
+    elif [[ $v == <->(|.<->)(|.<->) ]]; then
+      dirs=("$NVM_DIR"/versions/node/v$v(|.*)(N/nOn))
+    fi
+    (( $#dirs )) && path=("$dirs[1]/bin" $path)
+  }
+
+  # The inner anonymous function keeps nvm's arguments out of nvm.sh's $@.
+  nvm() {
+    unset -f nvm
+    () { . "$NVM_DIR/nvm.sh" }
+    [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
+    nvm "$@"
+  }
+fi
 
 source "$ZSH/oh-my-zsh.sh"
 
@@ -69,11 +102,6 @@ setopt HIST_IGNORE_DUPS
 setopt HIST_EXPIRE_DUPS_FIRST
 setopt HIST_FIND_NO_DUPS
 
-# Node version management (nvm, installed by install.sh).
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
-
 # Cloudflare CLI completion, written by install.sh. Tab still runs `cf`.
 [ -f "$HOME/.config/cf/complete.zsh" ] && . "$HOME/.config/cf/complete.zsh"
 
@@ -91,6 +119,15 @@ else
   export EDITOR=nano
 fi
 export VISUAL=$EDITOR
+
+# Per-directory env: loads a project's .envrc (or .env, see
+# direnv/direnv.toml) after `direnv allow`, unloads it on the way out.
+# Replaces omz's dotenv plugin. A plain hook rather than omz's direnv plugin,
+# matching zoxide above. Its default "direnv: loading" / "export +VAR" lines
+# stay on: they show which variables a cd just changed.
+if (( $+commands[direnv] )); then
+  eval "$(direnv hook zsh)"
+fi
 
 # Fuzzy history search with Ctrl+R and file search with Ctrl+T.
 # `fzf --zsh` needs fzf 0.48+; older distro packages ship the scripts on disk.
@@ -131,6 +168,14 @@ fi
 
 (( $+commands[rg] )) && alias grep='rg'
 (( $+commands[lazygit] )) && alias lg='lazygit'
+
+# WSL (wslu): open URLs and files in the Windows default browser or app.
+# BROWSER covers gh, xdg-open, Python's webbrowser and friends. `open` is
+# macOS muscle memory, aliased only where no real `open` exists.
+if (( $+commands[wslview] )); then
+  export BROWSER=wslview
+  (( $+commands[open] )) || alias open='wslview'
+fi
 
 # Bootdev submit.
 alias bdev='yes | bootdev run -s'

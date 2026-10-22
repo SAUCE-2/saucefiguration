@@ -9,6 +9,7 @@ symlinked. The user copies them into place by hand.
 - `git/.gitconfig`: global git config. Commits and tags are SSH-signed.
 - `ssh/`: client config, `authorized_keys` and `allowed_signers`. Public keys only.
 - `ohmyposh/theme.omp.json`: prompt theme.
+- `direnv/direnv.toml`: direnv config, copied to `~/.config/direnv/`.
 - `tmux/.tmux.conf`: tmux config, copied to `~/.tmux.conf`.
 
 ## Rules

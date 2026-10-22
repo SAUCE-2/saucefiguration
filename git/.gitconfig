@@ -14,6 +14,13 @@
 
 [diff]
 	algorithm = histogram
+	colorMoved = default
+
+[branch]
+	sort = -committerdate
+
+[help]
+	autocorrect = prompt
 
 [merge]
 	ff = true
@@ -27,6 +34,7 @@
 
 [push]
 	autoSetupRemote = true
+	followTags = true
 
 [pull]
 	rebase = true
@@ -34,7 +42,7 @@
 
 [fetch]
 	prune = true
-	# No pruneTags: it deletes unpushed local tags on every fetch, git-auto-fetch included.
+	# No pruneTags: it deletes unpushed local tags on every fetch.
 
 [commit]
 	gpgsign = true

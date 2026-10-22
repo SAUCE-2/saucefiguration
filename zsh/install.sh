@@ -31,11 +31,20 @@ packages="
   ripgrep:rg
   fzf:fzf
   zoxide:zoxide
+  direnv:direnv
   lazygit:lazygit
   tmux:tmux
   micro:micro
+  gh:gh
   zsh-autosuggestions:
   zsh-syntax-highlighting:
+"
+
+# Same format. Joins packages only under WSL (see is_wsl), so other systems
+# neither install nor verify them. wslu provides wslview, which the linux
+# .zshrc uses as $BROWSER.
+wsl_packages="
+  wslu:wslview
 "
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
@@ -90,6 +99,7 @@ pkg_name() {
     dnf:openssh-client) echo openssh-clients ;;
     pacman:openssh-client | zypper:openssh-client) echo openssh ;;
     zypper:micro) echo micro-editor ;;
+    pacman:gh | apk:gh) echo github-cli ;;
     apt-get:go) echo golang-go ;;
     dnf:go) echo golang ;;
     *) echo "$2" ;;
@@ -133,6 +143,19 @@ find_plugin() {
       return 0
     fi
   done
+  return 1
+}
+
+# True inside WSL 1 or 2. WSL_DISTRO_NAME is gone under sudo or env -i, so
+# also look for the interop handler and the kernel release string.
+# SAUCE_WSL_INTEROP is for tests.
+is_wsl() {
+  [ "$(uname -s)" = Linux ] || return 1
+  [ -n "${WSL_DISTRO_NAME:-}" ] && return 0
+  [ -e "${SAUCE_WSL_INTEROP:-/proc/sys/fs/binfmt_misc/WSLInterop}" ] && return 0
+  case "$(uname -r)" in
+    *[Mm]icrosoft* | *WSL*) return 0 ;;
+  esac
   return 1
 }
 
@@ -249,6 +272,18 @@ install_user() {
     zoxide)
       curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
       ;;
+    direnv)
+      # Released as a bare static binary, not a tarball.
+      goarch=amd64
+      [ "$cpu" = aarch64 ] && goarch=arm64
+      curl -fsSL -o "$HOME/.local/bin/direnv.tmp.$$" \
+        "https://github.com/direnv/direnv/releases/latest/download/direnv.linux-${goarch}" || {
+        rm -f "$HOME/.local/bin/direnv.tmp.$$"
+        return 1
+      }
+      chmod +x "$HOME/.local/bin/direnv.tmp.$$"
+      mv -f "$HOME/.local/bin/direnv.tmp.$$" "$HOME/.local/bin/direnv"
+      ;;
     lazygit)
       tag=$(github_latest_tag jesseduffield/lazygit) || return 1
       ver=${tag#v}
@@ -262,6 +297,14 @@ install_user() {
       farch=linux64-static
       [ "$cpu" = aarch64 ] && farch=linux-arm64
       install_gh_tar "https://github.com/micro-editor/micro/releases/download/${tag}/micro-${ver}-${farch}.tar.gz" micro
+      ;;
+    gh)
+      # Older Debian and Ubuntu releases lack gh without GitHub's apt repo.
+      tag=$(github_latest_tag cli/cli) || return 1
+      ver=${tag#v}
+      goarch=amd64
+      [ "$cpu" = aarch64 ] && goarch=arm64
+      install_gh_tar "https://github.com/cli/cli/releases/download/${tag}/gh_${ver}_linux_${goarch}.tar.gz" gh
       ;;
     *) return 1 ;;
   esac
@@ -413,6 +456,10 @@ install_dotfiles() {
     [ -f "$src" ] || continue
     copy_file "$src" "$HOME/.config/ohmyposh/$(basename "$src")"
   done
+  for src in "$root/direnv"/* "$root/direnv"/.[!.]*; do
+    [ -f "$src" ] || continue
+    copy_file "$src" "$HOME/.config/direnv/$(basename "$src")"
+  done
 
   if [ "${DRY_RUN:-0}" != 1 ]; then
     mkdir -p "$HOME/.ssh"
@@ -509,6 +556,25 @@ install_webi() {
   webi_rc_restore
 }
 
+# tpm plus the plugins tmux/.tmux.conf declares (resurrect, continuum). Runs
+# after install_dotfiles: install_plugins reads the @plugin list from
+# ~/.tmux.conf.
+install_tmux_plugins() {
+  local tpm="$HOME/.tmux/plugins/tpm"
+  if ! have tmux; then
+    warn "no tmux; skipping tmux plugins"
+    return 0
+  fi
+  log "Installing tmux plugins"
+  if [ ! -x "$tpm/tpm" ]; then
+    run git clone --depth 1 https://github.com/tmux-plugins/tpm "$tpm" || {
+      fail "tpm clone"
+      return 0
+    }
+  fi
+  run "$tpm/bin/install_plugins" || fail "tmux plugin install"
+}
+
 # install.test.sh sources this file for the functions above and nothing else.
 if [ "${SAUCE_LIB_ONLY:-0}" = 1 ]; then
   return 0
@@ -533,6 +599,11 @@ if [ -z "$PM" ]; then
   exit 1
 fi
 log "Using $PM on $(uname -s) $(uname -m)"
+
+if is_wsl; then
+  log "WSL detected; adding WSL-only packages"
+  packages="$packages$wsl_packages"
+fi
 
 PM_WRITE=1
 if ! pm_can_write "$PM"; then
@@ -622,7 +693,7 @@ if [ -s "$NVM_DIR/nvm.sh" ]; then
   log "nvm already installed"
 else
   log "Installing nvm into ~/.nvm"
-  # PROFILE=/dev/null: the .zshrc in this repo already sources nvm.sh.
+  # PROFILE=/dev/null: the .zshrc in this repo already loads nvm.
   run bash -c 'curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | PROFILE=/dev/null bash' ||
     fail "nvm install"
 fi
@@ -803,6 +874,7 @@ if [ "$missing" -gt 0 ]; then
 fi
 
 install_dotfiles
+install_tmux_plugins
 # Stamp even when a step failed: the configs are in, and an unstamped rev
 # would have every new shell offer the same update again.
 record_install_rev
