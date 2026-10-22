@@ -49,6 +49,14 @@ for v in go1.19.8 go1.23.4 go1.9 devel garbage; do
     exit 1
   }
 done
+[ "$(pkg_name apk git-delta)" = delta ] || {
+  echo 'pkg_name apk git-delta' >&2
+  exit 1
+}
+[ "$(pkg_name apt-get git-delta)" = git-delta ] || {
+  echo 'pkg_name apt-get git-delta' >&2
+  exit 1
+}
 [ -z "$(pkg_name apt-get yq)" ] || {
   echo 'pkg_name apt-get yq should be empty (Debian yq is the Python one)' >&2
   exit 1
