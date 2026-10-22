@@ -31,6 +31,8 @@ packages="
   ripgrep:rg
   fzf:fzf
   zoxide:zoxide
+  jq:jq
+  yq:yq
   direnv:direnv
   lazygit:lazygit
   git-delta:delta
@@ -102,6 +104,12 @@ pkg_name() {
     apt-get:go) echo golang-go ;;
     dnf:go) echo golang ;;
     apk:git-delta) echo delta ;;
+    # yq means mikefarah's Go yq. Debian/Ubuntu's yq is kislyuk's Python
+    # wrapper around jq (other syntax), so apt gets none and install_user
+    # fetches the release binary. Arch and Alpine ship the Go one renamed.
+    apt-get:yq) ;;
+    pacman:yq) echo go-yq ;;
+    apk:yq) echo yq-go ;;
     *) echo "$2" ;;
   esac
 }
@@ -109,6 +117,7 @@ pkg_name() {
 install_pkg() {
   local pkg
   pkg=$(pkg_name "$PM" "$1")
+  [ -n "$pkg" ] || return 1
   case "$PM" in
     brew) run brew install "$pkg" ;;
     apt-get) as_root apt-get install -y "$pkg" ;;
@@ -119,13 +128,28 @@ install_pkg() {
   esac
 }
 
+# True when $1 is on PATH. A yq only counts if it is mikefarah's: the Python
+# yq answers to the same name but takes different syntax.
+have_tool() {
+  case "$1" in
+    yq)
+      have yq || return 1
+      case "$(yq --version 2>&1)" in
+        *mikefarah*) return 0 ;;
+        *) return 1 ;;
+      esac
+      ;;
+    *) have "$1" ;;
+  esac
+}
+
 # Reports which of $2.. resolved for the tool named $1. Debian renames some
 # binaries (batcat, fdfind), so a tool can answer to more than one name.
 check() {
   local label=$1 cmd
   shift
   for cmd in "$@"; do
-    if have "$cmd"; then
+    if have_tool "$cmd"; then
       printf '  ok       %-22s %s\n' "$label" "$cmd"
       return 0
     fi
@@ -209,6 +233,19 @@ install_gh_tar() {
   mv "$found" "$HOME/.local/bin/$bin"
   chmod +x "$HOME/.local/bin/$bin"
   rm -rf "$tmp"
+}
+
+# Download $1 (a bare binary URL) to ~/.local/bin/$2.
+install_gh_bin() {
+  local url=$1 bin=$2 tmp
+  mkdir -p "$HOME/.local/bin"
+  tmp="$HOME/.local/bin/.$bin.tmp.$$"
+  if ! curl -fsSL -o "$tmp" "$url"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  chmod +x "$tmp"
+  mv -f "$tmp" "$HOME/.local/bin/$bin"
 }
 
 # User-space copy of a tool the distro manager could not install. Linux only.
@@ -299,6 +336,16 @@ install_user() {
       else
         install_gh_tar "https://github.com/dandavison/delta/releases/download/${tag}/delta-${tag}-aarch64-unknown-linux-gnu.tar.gz" delta
       fi
+      ;;
+    jq)
+      goarch=amd64
+      [ "$cpu" = aarch64 ] && goarch=arm64
+      install_gh_bin "https://github.com/jqlang/jq/releases/latest/download/jq-linux-${goarch}" jq
+      ;;
+    yq)
+      goarch=amd64
+      [ "$cpu" = aarch64 ] && goarch=arm64
+      install_gh_bin "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${goarch}" yq
       ;;
     gh)
       # Older Debian and Ubuntu releases lack gh without GitHub's apt repo.
@@ -639,7 +686,7 @@ for entry in $packages; do
     present=0
     # Word splitting on the comma list is deliberate: one tool, several names.
     for cmd in $(echo "$binaries" | tr ',' ' '); do
-      if have "$cmd"; then
+      if have_tool "$cmd"; then
         present=1
         break
       fi
