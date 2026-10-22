@@ -5,7 +5,6 @@
 
 [core]
 	autocrlf = input
-	editor = nano
 	untrackedCache = true
 	longpaths = true
 	excludesFile = ~/.gitignore_global
