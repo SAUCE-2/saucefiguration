@@ -41,6 +41,9 @@ plugins=(
 # omz's tmux plugin prints an error at every start if tmux is missing.
 (( $+commands[tmux] )) && plugins+=(tmux)
 
+# omz's gh plugin builds its completions by running gh, so it needs gh.
+(( $+commands[gh] )) && plugins+=(gh)
+
 # After each command, print any shorter alias you could have used instead.
 zstyle ':omz:plugins:alias-finder' autoload yes
 zstyle ':omz:plugins:alias-finder' cheaper yes
