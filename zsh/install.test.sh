@@ -227,6 +227,38 @@ copy_file "$src" "$mode_dest" 600
   exit 1
 }
 
+# tmux plugins: clone tpm once, then install the declared plugins.
+th="$work/tmuxhome"
+mkdir -p "$th" "$work/tmuxbin" "$work/notmux"
+printf '#!/bin/sh\n' >"$work/tmuxbin/tmux"
+chmod +x "$work/tmuxbin/tmux"
+out=$(HOME="$th" PATH="$work/tmuxbin" DRY_RUN=1 install_tmux_plugins 2>&1)
+printf '%s\n' "$out" | grep -q "would run: git clone --depth 1 https://github.com/tmux-plugins/tpm $th/.tmux/plugins/tpm" || {
+  printf 'tmux plugins dry-run missed the tpm clone\n%s\n' "$out" >&2
+  exit 1
+}
+printf '%s\n' "$out" | grep -q "would run: $th/.tmux/plugins/tpm/bin/install_plugins" || {
+  printf 'tmux plugins dry-run missed install_plugins\n%s\n' "$out" >&2
+  exit 1
+}
+mkdir -p "$th/.tmux/plugins/tpm"
+printf '#!/bin/sh\n' >"$th/.tmux/plugins/tpm/tpm"
+chmod +x "$th/.tmux/plugins/tpm/tpm"
+out=$(HOME="$th" PATH="$work/tmuxbin" DRY_RUN=1 install_tmux_plugins 2>&1)
+printf '%s\n' "$out" | grep -q 'git clone' && {
+  printf 'tmux plugins should not re-clone tpm\n%s\n' "$out" >&2
+  exit 1
+}
+printf '%s\n' "$out" | grep -q 'install_plugins' || {
+  printf 'tmux plugins should still install plugins with tpm present\n%s\n' "$out" >&2
+  exit 1
+}
+out=$(HOME="$th" PATH="$work/notmux" DRY_RUN=1 install_tmux_plugins 2>&1)
+printf '%s\n' "$out" | grep -q 'install_plugins' && {
+  printf 'tmux plugins should skip without tmux\n%s\n' "$out" >&2
+  exit 1
+}
+
 # Full set of repo configs into a fake $HOME.
 tree="$work/repo"
 home="$work/home"

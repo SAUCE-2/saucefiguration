@@ -500,6 +500,25 @@ install_webi() {
   webi_rc_restore
 }
 
+# tpm plus the plugins tmux/.tmux.conf declares (resurrect, continuum). Runs
+# after install_dotfiles: install_plugins reads the @plugin list from
+# ~/.tmux.conf.
+install_tmux_plugins() {
+  local tpm="$HOME/.tmux/plugins/tpm"
+  if ! have tmux; then
+    warn "no tmux; skipping tmux plugins"
+    return 0
+  fi
+  log "Installing tmux plugins"
+  if [ ! -x "$tpm/tpm" ]; then
+    run git clone --depth 1 https://github.com/tmux-plugins/tpm "$tpm" || {
+      fail "tpm clone"
+      return 0
+    }
+  fi
+  run "$tpm/bin/install_plugins" || fail "tmux plugin install"
+}
+
 # install.test.sh sources this file for the functions above and nothing else.
 if [ "${SAUCE_LIB_ONLY:-0}" = 1 ]; then
   return 0
@@ -794,6 +813,7 @@ if [ "$missing" -gt 0 ]; then
 fi
 
 install_dotfiles
+install_tmux_plugins
 # Stamp even when a step failed: the configs are in, and an unstamped rev
 # would have every new shell offer the same update again.
 record_install_rev
