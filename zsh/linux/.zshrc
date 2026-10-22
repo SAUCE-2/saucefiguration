@@ -14,7 +14,6 @@ plugins=(
   alias-finder
   brew
   command-not-found
-  dotenv
   eza
   fzf
   git
@@ -112,6 +111,24 @@ if (( $+commands[zoxide] )); then
   eval "$(zoxide init --cmd cd zsh)"
 fi
 
+# Editor for git commit, crontab -e and the rest. git falls through to
+# $VISUAL/$EDITOR because .gitconfig sets no core.editor. micro is optional.
+if (( $+commands[micro] )); then
+  export EDITOR=micro
+else
+  export EDITOR=nano
+fi
+export VISUAL=$EDITOR
+
+# Per-directory env: loads a project's .envrc (or .env, see
+# direnv/direnv.toml) after `direnv allow`, unloads it on the way out.
+# Replaces omz's dotenv plugin. A plain hook rather than omz's direnv plugin,
+# matching zoxide above. Its default "direnv: loading" / "export +VAR" lines
+# stay on: they show which variables a cd just changed.
+if (( $+commands[direnv] )); then
+  eval "$(direnv hook zsh)"
+fi
+
 # Fuzzy history search with Ctrl+R and file search with Ctrl+T.
 # `fzf --zsh` needs fzf 0.48+; older distro packages ship the scripts on disk.
 if (( $+commands[fzf] )); then
@@ -152,6 +169,18 @@ fi
 (( $+commands[rg] )) && alias grep='rg'
 (( $+commands[lazygit] )) && alias lg='lazygit'
 
+# Syntax-highlighted git diffs. Set here rather than as core.pager in
+# .gitconfig, so git on a machine without delta keeps using less.
+(( $+commands[delta] )) && export GIT_PAGER=delta
+
+# WSL (wslu): open URLs and files in the Windows default browser or app.
+# BROWSER covers gh, xdg-open, Python's webbrowser and friends. `open` is
+# macOS muscle memory, aliased only where no real `open` exists.
+if (( $+commands[wslview] )); then
+  export BROWSER=wslview
+  (( $+commands[open] )) || alias open='wslview'
+fi
+
 # Bootdev submit.
 alias bdev='yes | bootdev run -s'
 
@@ -177,6 +206,25 @@ _source_zsh_plugin() {
     fi
   done
 }
+
+# Tab completion through fzf. Needs compinit (oh-my-zsh.sh) first, and must
+# load before autosuggestions and syntax highlighting, which wrap widgets.
+if (( $+commands[fzf] )); then
+  # omz sets `menu select` on this exact pattern; a shorter one would lose to it.
+  zstyle ':completion:*:*:*:*:*' menu no
+  # fzf-tab shows these as group headers; switch groups with < and >.
+  zstyle ':completion:*:descriptions' format '[%d]'
+  zstyle ':fzf-tab:*' switch-group '<' '>'
+  # Keep git checkout's branch order (recent first) instead of alphabetical.
+  zstyle ':completion:*:git-checkout:*' sort false
+  # Preview the directory under the cursor when completing cd.
+  if (( $+commands[eza] )); then
+    zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza -1 --icons --color=always $realpath'
+  else
+    zstyle ':fzf-tab:complete:cd:*' fzf-preview 'ls -1 $realpath'
+  fi
+  _source_zsh_plugin fzf-tab
+fi
 
 # Inline grey history suggestions. Accept with Right Arrow.
 _source_zsh_plugin zsh-autosuggestions

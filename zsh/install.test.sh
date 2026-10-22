@@ -25,6 +25,10 @@ file_mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
   echo 'pkg_name dnf go' >&2
   exit 1
 }
+[ "$(pkg_name zypper micro)" = micro-editor ] || {
+  echo 'pkg_name zypper micro' >&2
+  exit 1
+}
 for pm in pacman apk; do
   [ "$(pkg_name "$pm" gh)" = github-cli ] || {
     echo "pkg_name $pm gh" >&2
@@ -49,6 +53,30 @@ for v in go1.19.8 go1.23.4 go1.9 devel garbage; do
     exit 1
   }
 done
+[ "$(pkg_name apk git-delta)" = delta ] || {
+  echo 'pkg_name apk git-delta' >&2
+  exit 1
+}
+[ "$(pkg_name apt-get git-delta)" = git-delta ] || {
+  echo 'pkg_name apt-get git-delta' >&2
+  exit 1
+}
+[ -z "$(pkg_name apt-get yq)" ] || {
+  echo 'pkg_name apt-get yq should be empty (Debian yq is the Python one)' >&2
+  exit 1
+}
+[ "$(pkg_name pacman yq)" = go-yq ] || {
+  echo 'pkg_name pacman yq' >&2
+  exit 1
+}
+[ "$(pkg_name apk yq)" = yq-go ] || {
+  echo 'pkg_name apk yq' >&2
+  exit 1
+}
+DRY_RUN=1 PM=apt-get install_pkg yq && {
+  echo 'install_pkg yq should refuse on apt-get' >&2
+  exit 1
+}
 [ "$(pkg_name pacman eza)" = eza ] || {
   echo 'pkg_name passthrough' >&2
   exit 1
@@ -56,6 +84,40 @@ done
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
+
+# is_wsl: a fake uname answers -s with $FAKE_S and -r with $FAKE_R.
+mkdir -p "$work/wsl"
+cat >"$work/wsl/uname" <<'EOF'
+#!/bin/sh
+case "$1" in -r) echo "$FAKE_R" ;; *) echo "$FAKE_S" ;; esac
+EOF
+chmod +x "$work/wsl/uname"
+wsl_case() { # expect(0|1) uname-s uname-r WSL_DISTRO_NAME interop-file
+  local got=0
+  PATH="$work/wsl:$PATH" FAKE_S=$2 FAKE_R=$3 WSL_DISTRO_NAME=$4 SAUCE_WSL_INTEROP=$5 is_wsl || got=1
+  [ "$got" = "$1" ] || {
+    echo "is_wsl -s '$2' -r '$3' distro '$4' interop '$5': want $1, got $got" >&2
+    exit 1
+  }
+}
+touch "$work/wsl/WSLInterop"
+wsl_case 1 Linux 6.8.0-45-generic '' "$work/wsl/none"
+wsl_case 1 Darwin 23.6.0 Ubuntu "$work/wsl/WSLInterop"
+wsl_case 0 Linux 6.6.87.2-microsoft-standard-WSL2 '' "$work/wsl/none"
+wsl_case 0 Linux 4.4.0-19041-Microsoft '' "$work/wsl/none"
+wsl_case 0 Linux 6.8.0-45-generic Ubuntu "$work/wsl/none"
+wsl_case 0 Linux 6.8.0-45-generic '' "$work/wsl/WSLInterop"
+# Only the WSL list carries wslu.
+case "$packages" in *wslu*)
+  echo 'wslu belongs in wsl_packages, not packages' >&2
+  exit 1
+  ;;
+esac
+case "$wsl_packages" in *wslu:wslview*) ;; *)
+  echo 'wsl_packages lost wslu:wslview' >&2
+  exit 1
+  ;;
+esac
 
 printf '%s\n' '#!/bin/sh' 'echo ro,relatime' >"$work/findmnt"
 chmod +x "$work/findmnt"
@@ -100,6 +162,33 @@ touch "$work/brew/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
 got=$(HOMEBREW_PREFIX="$work/brew" HOME="$work/home" find_plugin zsh-autosuggestions)
 [ "$got" = "$work/brew/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ] || {
   echo "find_plugin should prefer Homebrew's copy: $got" >&2
+  exit 1
+}
+
+# fzf-tab's clone and Homebrew's pkgshare both put fzf-tab.zsh at the top.
+mkdir -p "$work/home/.local/share/fzf-tab"
+touch "$work/home/.local/share/fzf-tab/fzf-tab.zsh"
+got=$(HOMEBREW_PREFIX='' HOME="$work/home" find_plugin fzf-tab)
+[ "$got" = "$work/home/.local/share/fzf-tab/fzf-tab.zsh" ] || {
+  echo "find_plugin fzf-tab path: $got" >&2
+  exit 1
+}
+# Distro managers don't carry fzf-tab: skip them so install_user clones it.
+PM=pacman install_pkg fzf-tab && {
+  echo 'install_pkg fzf-tab should defer to install_user off Homebrew' >&2
+  exit 1
+}
+
+mkdir -p "$work/yqpy" "$work/yqgo"
+printf '#!/bin/sh\necho yq 3.4.3\n' >"$work/yqpy/yq"
+printf '#!/bin/sh\necho "yq (https://github.com/mikefarah/yq/) version v4.45.1"\n' >"$work/yqgo/yq"
+chmod +x "$work/yqpy/yq" "$work/yqgo/yq"
+PATH="$work/yqpy:/usr/bin:/bin" have_tool yq && {
+  echo 'have_tool should reject the Python yq' >&2
+  exit 1
+}
+PATH="$work/yqgo:/usr/bin:/bin" have_tool yq || {
+  echo "have_tool should accept mikefarah's yq" >&2
   exit 1
 }
 
@@ -239,16 +328,49 @@ copy_file "$src" "$mode_dest" 600
   exit 1
 }
 
+# tmux plugins: clone tpm once, then install the declared plugins.
+th="$work/tmuxhome"
+mkdir -p "$th" "$work/tmuxbin" "$work/notmux"
+printf '#!/bin/sh\n' >"$work/tmuxbin/tmux"
+chmod +x "$work/tmuxbin/tmux"
+out=$(HOME="$th" PATH="$work/tmuxbin" DRY_RUN=1 install_tmux_plugins 2>&1)
+printf '%s\n' "$out" | grep -q "would run: git clone --depth 1 https://github.com/tmux-plugins/tpm $th/.tmux/plugins/tpm" || {
+  printf 'tmux plugins dry-run missed the tpm clone\n%s\n' "$out" >&2
+  exit 1
+}
+printf '%s\n' "$out" | grep -q "would run: $th/.tmux/plugins/tpm/bin/install_plugins" || {
+  printf 'tmux plugins dry-run missed install_plugins\n%s\n' "$out" >&2
+  exit 1
+}
+mkdir -p "$th/.tmux/plugins/tpm"
+printf '#!/bin/sh\n' >"$th/.tmux/plugins/tpm/tpm"
+chmod +x "$th/.tmux/plugins/tpm/tpm"
+out=$(HOME="$th" PATH="$work/tmuxbin" DRY_RUN=1 install_tmux_plugins 2>&1)
+printf '%s\n' "$out" | grep -q 'git clone' && {
+  printf 'tmux plugins should not re-clone tpm\n%s\n' "$out" >&2
+  exit 1
+}
+printf '%s\n' "$out" | grep -q 'install_plugins' || {
+  printf 'tmux plugins should still install plugins with tpm present\n%s\n' "$out" >&2
+  exit 1
+}
+out=$(HOME="$th" PATH="$work/notmux" DRY_RUN=1 install_tmux_plugins 2>&1)
+printf '%s\n' "$out" | grep -q 'install_plugins' && {
+  printf 'tmux plugins should skip without tmux\n%s\n' "$out" >&2
+  exit 1
+}
+
 # Full set of repo configs into a fake $HOME.
 tree="$work/repo"
 home="$work/home"
-mkdir -p "$tree/zsh/linux" "$tree/zsh/darwin" "$tree/tmux" "$tree/git" "$tree/ohmyposh" "$tree/ssh"
+mkdir -p "$tree/zsh/linux" "$tree/zsh/darwin" "$tree/tmux" "$tree/git" "$tree/ohmyposh" "$tree/direnv" "$tree/ssh"
 printf 'zshrc\n' >"$tree/zsh/linux/.zshrc"
 printf 'zshrc\n' >"$tree/zsh/darwin/.zshrc"
 printf 'tmux\n' >"$tree/tmux/.tmux.conf"
 printf 'gitconfig\n' >"$tree/git/.gitconfig"
 printf 'ignore\n' >"$tree/git/.gitignore_global"
 printf 'omp\n' >"$tree/ohmyposh/theme.omp.json"
+printf 'direnv\n' >"$tree/direnv/direnv.toml"
 printf 'sshconfig\n' >"$tree/ssh/config"
 printf 'keys\n' >"$tree/ssh/authorized_keys"
 printf 'signers\n' >"$tree/ssh/allowed_signers"
@@ -278,6 +400,10 @@ printf '%s\n' "$err" | grep -q "replacing $home/.zshrc" || {
 }
 [ "$(cat "$home/.config/ohmyposh/theme.omp.json")" = omp ] || {
   echo 'install_dotfiles missed ohmyposh theme' >&2
+  exit 1
+}
+[ "$(cat "$home/.config/direnv/direnv.toml")" = direnv ] || {
+  echo 'install_dotfiles missed direnv config' >&2
   exit 1
 }
 [ "$(cat "$home/.ssh/config")" = sshconfig ] || {
@@ -348,7 +474,7 @@ printf '%s\n' "$err" | grep -q 'replacing' && {
   exit 1
 }
 
-# Real clone: every file in git/, ssh/, ohmyposh/ must land in $HOME.
+# Real clone: every file in git/, ssh/, ohmyposh/, direnv/ must land in $HOME.
 # zsh/ is only the platform .zshrc; install.sh and tests stay in the clone.
 real_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
 real_home="$work/realhome"
@@ -377,6 +503,13 @@ for src in "$real_root/ohmyposh"/* "$real_root/ohmyposh"/.[!.]*; do
   [ -f "$src" ] || continue
   cmp -s "$src" "$real_home/.config/ohmyposh/$(basename "$src")" || {
     echo "install_dotfiles missed real ohmyposh/$(basename "$src")" >&2
+    exit 1
+  }
+done
+for src in "$real_root/direnv"/* "$real_root/direnv"/.[!.]*; do
+  [ -f "$src" ] || continue
+  cmp -s "$src" "$real_home/.config/direnv/$(basename "$src")" || {
+    echo "install_dotfiles missed real direnv/$(basename "$src")" >&2
     exit 1
   }
 done
@@ -414,7 +547,7 @@ fail_home="$work/failhome"
 mkdir -p "$fail_home"
 status=0
 out=$(env -i HOME="$fail_home" PATH="$stubs" SAUCE_ROOT="$tree" SAUCE_STATE_DIR="$work/failstate" \
-  "$BASH" "$script_dir/install.sh" 2>&1) || status=$?
+  SAUCE_WSL_INTEROP="$work/wsl/none" "$BASH" "$script_dir/install.sh" 2>&1) || status=$?
 [ "$status" = 1 ] || {
   printf 'failed install should exit 1, got %s\n%s\n' "$status" "$out" >&2
   exit 1
@@ -434,6 +567,11 @@ printf '%s\n' "$out" | grep -q 'apt-get update, Oh My Zsh install, nvm install, 
 # No sudo still falls back to ~/.local.
 printf '%s\n' "$out" | grep -q 'Installing eza into ~/.local/bin' || {
   printf 'no ~/.local fallback without sudo\n%s\n' "$out" >&2
+  exit 1
+}
+# Plain Linux: WSL-only packages are neither tried nor reported missing.
+printf '%s\n' "$out" | grep -q 'wslu\|WSL' && {
+  printf 'plain Linux run mentioned WSL packages\n%s\n' "$out" >&2
   exit 1
 }
 

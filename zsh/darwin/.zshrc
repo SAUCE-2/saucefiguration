@@ -21,7 +21,6 @@ plugins=(
   alias-finder
   brew
   command-not-found
-  dotenv
   eza
   fzf
   git
@@ -103,7 +102,7 @@ git() {
 }
 
 # macOS uses Ctrl+S as XOFF, which freezes the terminal. Turn that off
-# so GNU nano receives it as Save. Apple's /usr/bin/nano is Pico and ignores it.
+# so micro and GNU nano receive it as Save. Apple's /usr/bin/nano is Pico and ignores it.
 # Terminal only: under IntelliJ's `zsh -l -i -c ...` stty has none and errors.
 if [[ -t 0 ]]; then
   stty -ixon
@@ -128,6 +127,24 @@ if (( $+commands[zoxide] )); then
   eval "$(zoxide init --cmd cd zsh)"
 fi
 
+# Editor for git commit, crontab -e and the rest. git falls through to
+# $VISUAL/$EDITOR because .gitconfig sets no core.editor. micro is optional.
+if (( $+commands[micro] )); then
+  export EDITOR=micro
+else
+  export EDITOR=nano
+fi
+export VISUAL=$EDITOR
+
+# Per-directory env: loads a project's .envrc (or .env, see
+# direnv/direnv.toml) after `direnv allow`, unloads it on the way out.
+# Replaces omz's dotenv plugin. A plain hook rather than omz's direnv plugin,
+# matching zoxide above. Its default "direnv: loading" / "export +VAR" lines
+# stay on: they show which variables a cd just changed.
+if (( $+commands[direnv] )); then
+  eval "$(direnv hook zsh)"
+fi
+
 # Fuzzy history search with Ctrl+R and file search with Ctrl+T.
 if (( $+commands[fzf] )); then
   source <(fzf --zsh)
@@ -146,6 +163,10 @@ fi
 (( $+commands[rg] )) && alias grep='rg'
 (( $+commands[lazygit] )) && alias lg='lazygit'
 
+# Syntax-highlighted git diffs. Set here rather than as core.pager in
+# .gitconfig, so git on a machine without delta keeps using less.
+(( $+commands[delta] )) && export GIT_PAGER=delta
+
 # Bootdev submit.
 alias bdev='yes | bootdev run -s'
 
@@ -158,6 +179,25 @@ if (( $+commands[oh-my-posh] )) && [ -f "$POSH_THEME" ]; then
     oh-my-posh init zsh \
       --config "$POSH_THEME"
   )"
+fi
+
+# Tab completion through fzf. Needs compinit (oh-my-zsh.sh) first, and must
+# load before autosuggestions and syntax highlighting, which wrap widgets.
+if (( $+commands[fzf] )) && [ -f "$HOMEBREW_PREFIX/share/fzf-tab/fzf-tab.zsh" ]; then
+  # omz sets `menu select` on this exact pattern; a shorter one would lose to it.
+  zstyle ':completion:*:*:*:*:*' menu no
+  # fzf-tab shows these as group headers; switch groups with < and >.
+  zstyle ':completion:*:descriptions' format '[%d]'
+  zstyle ':fzf-tab:*' switch-group '<' '>'
+  # Keep git checkout's branch order (recent first) instead of alphabetical.
+  zstyle ':completion:*:git-checkout:*' sort false
+  # Preview the directory under the cursor when completing cd.
+  if (( $+commands[eza] )); then
+    zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza -1 --icons --color=always $realpath'
+  else
+    zstyle ':fzf-tab:complete:cd:*' fzf-preview 'ls -1 $realpath'
+  fi
+  source "$HOMEBREW_PREFIX/share/fzf-tab/fzf-tab.zsh"
 fi
 
 # Inline grey history suggestions. Accept with Right Arrow.

@@ -31,11 +31,24 @@ packages="
   ripgrep:rg
   fzf:fzf
   zoxide:zoxide
+  jq:jq
+  yq:yq
+  direnv:direnv
   lazygit:lazygit
+  git-delta:delta
   tmux:tmux
+  micro:micro
   gh:gh
+  fzf-tab:
   zsh-autosuggestions:
   zsh-syntax-highlighting:
+"
+
+# Same format. Joins packages only under WSL (see is_wsl), so other systems
+# neither install nor verify them. wslu provides wslview, which the linux
+# .zshrc uses as $BROWSER.
+wsl_packages="
+  wslu:wslview
 "
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
@@ -89,16 +102,27 @@ pkg_name() {
     pacman:command-not-found) echo pkgfile ;;
     dnf:openssh-client) echo openssh-clients ;;
     pacman:openssh-client | zypper:openssh-client) echo openssh ;;
+    zypper:micro) echo micro-editor ;;
     pacman:gh | apk:gh) echo github-cli ;;
     apt-get:go) echo golang-go ;;
     dnf:go) echo golang ;;
+    apk:git-delta) echo delta ;;
+    # yq means mikefarah's Go yq. Debian/Ubuntu's yq is kislyuk's Python
+    # wrapper around jq (other syntax), so apt gets none and install_user
+    # fetches the release binary. Arch and Alpine ship the Go one renamed.
+    apt-get:yq) ;;
+    pacman:yq) echo go-yq ;;
+    apk:yq) echo yq-go ;;
     *) echo "$2" ;;
   esac
 }
 
 install_pkg() {
   local pkg
+  # Only Homebrew packages fzf-tab; elsewhere install_user clones it.
+  [ "$1" = fzf-tab ] && [ "$PM" != brew ] && return 1
   pkg=$(pkg_name "$PM" "$1")
+  [ -n "$pkg" ] || return 1
   case "$PM" in
     brew) run brew install "$pkg" ;;
     apt-get) as_root apt-get install -y "$pkg" ;;
@@ -109,13 +133,28 @@ install_pkg() {
   esac
 }
 
+# True when $1 is on PATH. A yq only counts if it is mikefarah's: the Python
+# yq answers to the same name but takes different syntax.
+have_tool() {
+  case "$1" in
+    yq)
+      have yq || return 1
+      case "$(yq --version 2>&1)" in
+        *mikefarah*) return 0 ;;
+        *) return 1 ;;
+      esac
+      ;;
+    *) have "$1" ;;
+  esac
+}
+
 # Reports which of $2.. resolved for the tool named $1. Debian renames some
 # binaries (batcat, fdfind), so a tool can answer to more than one name.
 check() {
   local label=$1 cmd
   shift
   for cmd in "$@"; do
-    if have "$cmd"; then
+    if have_tool "$cmd"; then
       printf '  ok       %-22s %s\n' "$label" "$cmd"
       return 0
     fi
@@ -133,6 +172,19 @@ find_plugin() {
       return 0
     fi
   done
+  return 1
+}
+
+# True inside WSL 1 or 2. WSL_DISTRO_NAME is gone under sudo or env -i, so
+# also look for the interop handler and the kernel release string.
+# SAUCE_WSL_INTEROP is for tests.
+is_wsl() {
+  [ "$(uname -s)" = Linux ] || return 1
+  [ -n "${WSL_DISTRO_NAME:-}" ] && return 0
+  [ -e "${SAUCE_WSL_INTEROP:-/proc/sys/fs/binfmt_misc/WSLInterop}" ] && return 0
+  case "$(uname -r)" in
+    *[Mm]icrosoft* | *WSL*) return 0 ;;
+  esac
   return 1
 }
 
@@ -188,9 +240,22 @@ install_gh_tar() {
   rm -rf "$tmp"
 }
 
+# Download $1 (a bare binary URL) to ~/.local/bin/$2.
+install_gh_bin() {
+  local url=$1 bin=$2 tmp
+  mkdir -p "$HOME/.local/bin"
+  tmp="$HOME/.local/bin/.$bin.tmp.$$"
+  if ! curl -fsSL -o "$tmp" "$url"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  chmod +x "$tmp"
+  mv -f "$tmp" "$HOME/.local/bin/$bin"
+}
+
 # User-space copy of a tool the distro manager could not install. Linux only.
 install_user() {
-  local pkg=$1 tag ver cpu goarch farch dest
+  local pkg=$1 tag ver cpu goarch farch dest repo
   [ "${DRY_RUN:-0}" = 1 ] && {
     printf '   would install %s into ~/.local\n' "$pkg"
     return 0
@@ -198,13 +263,17 @@ install_user() {
 
   case "$pkg" in
     git | curl) return 1 ;;
-    zsh-autosuggestions | zsh-syntax-highlighting)
+    fzf-tab | zsh-autosuggestions | zsh-syntax-highlighting)
       dest="$HOME/.local/share/$pkg"
       [ -f "$dest/$pkg.zsh" ] && return 0
       log "Installing $pkg into ~/.local/share"
       mkdir -p "$HOME/.local/share"
       rm -rf "$dest"
-      git clone --depth 1 "https://github.com/zsh-users/${pkg}.git" "$dest"
+      case "$pkg" in
+        fzf-tab) repo=Aloxaf/fzf-tab ;;
+        *) repo="zsh-users/$pkg" ;;
+      esac
+      git clone --depth 1 "https://github.com/${repo}.git" "$dest"
       return
       ;;
   esac
@@ -249,12 +318,50 @@ install_user() {
     zoxide)
       curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
       ;;
+    direnv)
+      # Released as a bare static binary, not a tarball.
+      goarch=amd64
+      [ "$cpu" = aarch64 ] && goarch=arm64
+      curl -fsSL -o "$HOME/.local/bin/direnv.tmp.$$" \
+        "https://github.com/direnv/direnv/releases/latest/download/direnv.linux-${goarch}" || {
+        rm -f "$HOME/.local/bin/direnv.tmp.$$"
+        return 1
+      }
+      chmod +x "$HOME/.local/bin/direnv.tmp.$$"
+      mv -f "$HOME/.local/bin/direnv.tmp.$$" "$HOME/.local/bin/direnv"
+      ;;
     lazygit)
       tag=$(github_latest_tag jesseduffield/lazygit) || return 1
       ver=${tag#v}
       goarch=$cpu
       [ "$cpu" = aarch64 ] && goarch=arm64
       install_gh_tar "https://github.com/jesseduffield/lazygit/releases/download/${tag}/lazygit_${ver}_linux_${goarch}.tar.gz" lazygit
+      ;;
+    micro)
+      tag=$(github_latest_tag micro-editor/micro) || return 1
+      ver=${tag#v}
+      farch=linux64-static
+      [ "$cpu" = aarch64 ] && farch=linux-arm64
+      install_gh_tar "https://github.com/micro-editor/micro/releases/download/${tag}/micro-${ver}-${farch}.tar.gz" micro
+      ;;
+    git-delta)
+      # Tags have no v prefix. Only x86_64 has a musl build.
+      tag=$(github_latest_tag dandavison/delta) || return 1
+      if [ "$cpu" = x86_64 ]; then
+        install_gh_tar "https://github.com/dandavison/delta/releases/download/${tag}/delta-${tag}-x86_64-unknown-linux-musl.tar.gz" delta
+      else
+        install_gh_tar "https://github.com/dandavison/delta/releases/download/${tag}/delta-${tag}-aarch64-unknown-linux-gnu.tar.gz" delta
+      fi
+      ;;
+    jq)
+      goarch=amd64
+      [ "$cpu" = aarch64 ] && goarch=arm64
+      install_gh_bin "https://github.com/jqlang/jq/releases/latest/download/jq-linux-${goarch}" jq
+      ;;
+    yq)
+      goarch=amd64
+      [ "$cpu" = aarch64 ] && goarch=arm64
+      install_gh_bin "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${goarch}" yq
       ;;
     gh)
       # Older Debian and Ubuntu releases lack gh without GitHub's apt repo.
@@ -414,6 +521,10 @@ install_dotfiles() {
     [ -f "$src" ] || continue
     copy_file "$src" "$HOME/.config/ohmyposh/$(basename "$src")"
   done
+  for src in "$root/direnv"/* "$root/direnv"/.[!.]*; do
+    [ -f "$src" ] || continue
+    copy_file "$src" "$HOME/.config/direnv/$(basename "$src")"
+  done
 
   if [ "${DRY_RUN:-0}" != 1 ]; then
     mkdir -p "$HOME/.ssh"
@@ -510,6 +621,25 @@ install_webi() {
   webi_rc_restore
 }
 
+# tpm plus the plugins tmux/.tmux.conf declares (resurrect, continuum). Runs
+# after install_dotfiles: install_plugins reads the @plugin list from
+# ~/.tmux.conf.
+install_tmux_plugins() {
+  local tpm="$HOME/.tmux/plugins/tpm"
+  if ! have tmux; then
+    warn "no tmux; skipping tmux plugins"
+    return 0
+  fi
+  log "Installing tmux plugins"
+  if [ ! -x "$tpm/tpm" ]; then
+    run git clone --depth 1 https://github.com/tmux-plugins/tpm "$tpm" || {
+      fail "tpm clone"
+      return 0
+    }
+  fi
+  run "$tpm/bin/install_plugins" || fail "tmux plugin install"
+}
+
 # install.test.sh sources this file for the functions above and nothing else.
 if [ "${SAUCE_LIB_ONLY:-0}" = 1 ]; then
   return 0
@@ -534,6 +664,11 @@ if [ -z "$PM" ]; then
   exit 1
 fi
 log "Using $PM on $(uname -s) $(uname -m)"
+
+if is_wsl; then
+  log "WSL detected; adding WSL-only packages"
+  packages="$packages$wsl_packages"
+fi
 
 PM_WRITE=1
 if ! pm_can_write "$PM"; then
@@ -567,7 +702,7 @@ for entry in $packages; do
     present=0
     # Word splitting on the comma list is deliberate: one tool, several names.
     for cmd in $(echo "$binaries" | tr ',' ' '); do
-      if have "$cmd"; then
+      if have_tool "$cmd"; then
         present=1
         break
       fi
@@ -783,7 +918,7 @@ for entry in $packages; do
   check "${entry%%:*}" $(echo "$binaries" | tr ',' ' ') || missing=$((missing + 1))
 done
 
-for plugin in zsh-autosuggestions zsh-syntax-highlighting; do
+for plugin in fzf-tab zsh-autosuggestions zsh-syntax-highlighting; do
   if plugin_path=$(find_plugin "$plugin"); then
     printf '  ok       %-22s %s\n' "$plugin" "$plugin_path"
   else
@@ -804,6 +939,7 @@ if [ "$missing" -gt 0 ]; then
 fi
 
 install_dotfiles
+install_tmux_plugins
 # Stamp even when a step failed: the configs are in, and an unstamped rev
 # would have every new shell offer the same update again.
 record_install_rev
