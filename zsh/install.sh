@@ -33,6 +33,7 @@ packages="
   zoxide:zoxide
   lazygit:lazygit
   tmux:tmux
+  gh:gh
   zsh-autosuggestions:
   zsh-syntax-highlighting:
 "
@@ -88,6 +89,7 @@ pkg_name() {
     pacman:command-not-found) echo pkgfile ;;
     dnf:openssh-client) echo openssh-clients ;;
     pacman:openssh-client | zypper:openssh-client) echo openssh ;;
+    pacman:gh | apk:gh) echo github-cli ;;
     apt-get:go) echo golang-go ;;
     dnf:go) echo golang ;;
     *) echo "$2" ;;
@@ -253,6 +255,14 @@ install_user() {
       goarch=$cpu
       [ "$cpu" = aarch64 ] && goarch=arm64
       install_gh_tar "https://github.com/jesseduffield/lazygit/releases/download/${tag}/lazygit_${ver}_linux_${goarch}.tar.gz" lazygit
+      ;;
+    gh)
+      # Older Debian and Ubuntu releases lack gh without GitHub's apt repo.
+      tag=$(github_latest_tag cli/cli) || return 1
+      ver=${tag#v}
+      goarch=amd64
+      [ "$cpu" = aarch64 ] && goarch=arm64
+      install_gh_tar "https://github.com/cli/cli/releases/download/${tag}/gh_${ver}_linux_${goarch}.tar.gz" gh
       ;;
     *) return 1 ;;
   esac
@@ -613,7 +623,7 @@ if [ -s "$NVM_DIR/nvm.sh" ]; then
   log "nvm already installed"
 else
   log "Installing nvm into ~/.nvm"
-  # PROFILE=/dev/null: the .zshrc in this repo already sources nvm.sh.
+  # PROFILE=/dev/null: the .zshrc in this repo already loads nvm.
   run bash -c 'curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | PROFILE=/dev/null bash' ||
     fail "nvm install"
 fi
