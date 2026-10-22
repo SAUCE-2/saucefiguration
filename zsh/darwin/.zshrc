@@ -102,7 +102,7 @@ git() {
 }
 
 # macOS uses Ctrl+S as XOFF, which freezes the terminal. Turn that off
-# so GNU nano receives it as Save. Apple's /usr/bin/nano is Pico and ignores it.
+# so micro and GNU nano receive it as Save. Apple's /usr/bin/nano is Pico and ignores it.
 # Terminal only: under IntelliJ's `zsh -l -i -c ...` stty has none and errors.
 if [[ -t 0 ]]; then
   stty -ixon
@@ -126,6 +126,15 @@ setopt HIST_FIND_NO_DUPS
 if (( $+commands[zoxide] )); then
   eval "$(zoxide init --cmd cd zsh)"
 fi
+
+# Editor for git commit, crontab -e and the rest. git falls through to
+# $VISUAL/$EDITOR because .gitconfig sets no core.editor. micro is optional.
+if (( $+commands[micro] )); then
+  export EDITOR=micro
+else
+  export EDITOR=nano
+fi
+export VISUAL=$EDITOR
 
 # Per-directory env: loads a project's .envrc (or .env, see
 # direnv/direnv.toml) after `direnv allow`, unloads it on the way out.
@@ -153,6 +162,10 @@ fi
 (( $+commands[fd] )) && alias find='fd'
 (( $+commands[rg] )) && alias grep='rg'
 (( $+commands[lazygit] )) && alias lg='lazygit'
+
+# Syntax-highlighted git diffs. Set here rather than as core.pager in
+# .gitconfig, so git on a machine without delta keeps using less.
+(( $+commands[delta] )) && export GIT_PAGER=delta
 
 # Bootdev submit.
 alias bdev='yes | bootdev run -s'

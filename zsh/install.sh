@@ -35,7 +35,9 @@ packages="
   yq:yq
   direnv:direnv
   lazygit:lazygit
+  git-delta:delta
   tmux:tmux
+  micro:micro
   gh:gh
   fzf-tab:
   zsh-autosuggestions:
@@ -100,9 +102,11 @@ pkg_name() {
     pacman:command-not-found) echo pkgfile ;;
     dnf:openssh-client) echo openssh-clients ;;
     pacman:openssh-client | zypper:openssh-client) echo openssh ;;
+    zypper:micro) echo micro-editor ;;
     pacman:gh | apk:gh) echo github-cli ;;
     apt-get:go) echo golang-go ;;
     dnf:go) echo golang ;;
+    apk:git-delta) echo delta ;;
     # yq means mikefarah's Go yq. Debian/Ubuntu's yq is kislyuk's Python
     # wrapper around jq (other syntax), so apt gets none and install_user
     # fetches the release binary. Arch and Alpine ship the Go one renamed.
@@ -332,6 +336,22 @@ install_user() {
       goarch=$cpu
       [ "$cpu" = aarch64 ] && goarch=arm64
       install_gh_tar "https://github.com/jesseduffield/lazygit/releases/download/${tag}/lazygit_${ver}_linux_${goarch}.tar.gz" lazygit
+      ;;
+    micro)
+      tag=$(github_latest_tag micro-editor/micro) || return 1
+      ver=${tag#v}
+      farch=linux64-static
+      [ "$cpu" = aarch64 ] && farch=linux-arm64
+      install_gh_tar "https://github.com/micro-editor/micro/releases/download/${tag}/micro-${ver}-${farch}.tar.gz" micro
+      ;;
+    git-delta)
+      # Tags have no v prefix. Only x86_64 has a musl build.
+      tag=$(github_latest_tag dandavison/delta) || return 1
+      if [ "$cpu" = x86_64 ]; then
+        install_gh_tar "https://github.com/dandavison/delta/releases/download/${tag}/delta-${tag}-x86_64-unknown-linux-musl.tar.gz" delta
+      else
+        install_gh_tar "https://github.com/dandavison/delta/releases/download/${tag}/delta-${tag}-aarch64-unknown-linux-gnu.tar.gz" delta
+      fi
       ;;
     jq)
       goarch=amd64
