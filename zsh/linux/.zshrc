@@ -169,6 +169,10 @@ fi
 (( $+commands[rg] )) && alias grep='rg'
 (( $+commands[lazygit] )) && alias lg='lazygit'
 
+# Syntax-highlighted git diffs. Set here rather than as core.pager in
+# .gitconfig, so git on a machine without delta keeps using less.
+(( $+commands[delta] )) && export GIT_PAGER=delta
+
 # WSL (wslu): open URLs and files in the Windows default browser or app.
 # BROWSER covers gh, xdg-open, Python's webbrowser and friends. `open` is
 # macOS muscle memory, aliased only where no real `open` exists.

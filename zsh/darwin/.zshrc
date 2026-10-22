@@ -163,6 +163,10 @@ fi
 (( $+commands[rg] )) && alias grep='rg'
 (( $+commands[lazygit] )) && alias lg='lazygit'
 
+# Syntax-highlighted git diffs. Set here rather than as core.pager in
+# .gitconfig, so git on a machine without delta keeps using less.
+(( $+commands[delta] )) && export GIT_PAGER=delta
+
 # Bootdev submit.
 alias bdev='yes | bootdev run -s'
 
