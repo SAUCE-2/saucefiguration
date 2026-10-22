@@ -39,6 +39,7 @@ packages="
   tmux:tmux
   micro:micro
   gh:gh
+  fzf-tab:
   zsh-autosuggestions:
   zsh-syntax-highlighting:
 "
@@ -118,6 +119,8 @@ pkg_name() {
 
 install_pkg() {
   local pkg
+  # Only Homebrew packages fzf-tab; elsewhere install_user clones it.
+  [ "$1" = fzf-tab ] && [ "$PM" != brew ] && return 1
   pkg=$(pkg_name "$PM" "$1")
   [ -n "$pkg" ] || return 1
   case "$PM" in
@@ -252,7 +255,7 @@ install_gh_bin() {
 
 # User-space copy of a tool the distro manager could not install. Linux only.
 install_user() {
-  local pkg=$1 tag ver cpu goarch farch dest
+  local pkg=$1 tag ver cpu goarch farch dest repo
   [ "${DRY_RUN:-0}" = 1 ] && {
     printf '   would install %s into ~/.local\n' "$pkg"
     return 0
@@ -260,13 +263,17 @@ install_user() {
 
   case "$pkg" in
     git | curl) return 1 ;;
-    zsh-autosuggestions | zsh-syntax-highlighting)
+    fzf-tab | zsh-autosuggestions | zsh-syntax-highlighting)
       dest="$HOME/.local/share/$pkg"
       [ -f "$dest/$pkg.zsh" ] && return 0
       log "Installing $pkg into ~/.local/share"
       mkdir -p "$HOME/.local/share"
       rm -rf "$dest"
-      git clone --depth 1 "https://github.com/zsh-users/${pkg}.git" "$dest"
+      case "$pkg" in
+        fzf-tab) repo=Aloxaf/fzf-tab ;;
+        *) repo="zsh-users/$pkg" ;;
+      esac
+      git clone --depth 1 "https://github.com/${repo}.git" "$dest"
       return
       ;;
   esac
@@ -911,7 +918,7 @@ for entry in $packages; do
   check "${entry%%:*}" $(echo "$binaries" | tr ',' ' ') || missing=$((missing + 1))
 done
 
-for plugin in zsh-autosuggestions zsh-syntax-highlighting; do
+for plugin in fzf-tab zsh-autosuggestions zsh-syntax-highlighting; do
   if plugin_path=$(find_plugin "$plugin"); then
     printf '  ok       %-22s %s\n' "$plugin" "$plugin_path"
   else

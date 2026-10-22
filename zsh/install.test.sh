@@ -165,6 +165,20 @@ got=$(HOMEBREW_PREFIX="$work/brew" HOME="$work/home" find_plugin zsh-autosuggest
   exit 1
 }
 
+# fzf-tab's clone and Homebrew's pkgshare both put fzf-tab.zsh at the top.
+mkdir -p "$work/home/.local/share/fzf-tab"
+touch "$work/home/.local/share/fzf-tab/fzf-tab.zsh"
+got=$(HOMEBREW_PREFIX='' HOME="$work/home" find_plugin fzf-tab)
+[ "$got" = "$work/home/.local/share/fzf-tab/fzf-tab.zsh" ] || {
+  echo "find_plugin fzf-tab path: $got" >&2
+  exit 1
+}
+# Distro managers don't carry fzf-tab: skip them so install_user clones it.
+PM=pacman install_pkg fzf-tab && {
+  echo 'install_pkg fzf-tab should defer to install_user off Homebrew' >&2
+  exit 1
+}
+
 mkdir -p "$work/yqpy" "$work/yqgo"
 printf '#!/bin/sh\necho yq 3.4.3\n' >"$work/yqpy/yq"
 printf '#!/bin/sh\necho "yq (https://github.com/mikefarah/yq/) version v4.45.1"\n' >"$work/yqgo/yq"

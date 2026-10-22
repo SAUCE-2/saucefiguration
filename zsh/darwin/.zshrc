@@ -181,6 +181,25 @@ if (( $+commands[oh-my-posh] )) && [ -f "$POSH_THEME" ]; then
   )"
 fi
 
+# Tab completion through fzf. Needs compinit (oh-my-zsh.sh) first, and must
+# load before autosuggestions and syntax highlighting, which wrap widgets.
+if (( $+commands[fzf] )) && [ -f "$HOMEBREW_PREFIX/share/fzf-tab/fzf-tab.zsh" ]; then
+  # omz sets `menu select` on this exact pattern; a shorter one would lose to it.
+  zstyle ':completion:*:*:*:*:*' menu no
+  # fzf-tab shows these as group headers; switch groups with < and >.
+  zstyle ':completion:*:descriptions' format '[%d]'
+  zstyle ':fzf-tab:*' switch-group '<' '>'
+  # Keep git checkout's branch order (recent first) instead of alphabetical.
+  zstyle ':completion:*:git-checkout:*' sort false
+  # Preview the directory under the cursor when completing cd.
+  if (( $+commands[eza] )); then
+    zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza -1 --icons --color=always $realpath'
+  else
+    zstyle ':fzf-tab:complete:cd:*' fzf-preview 'ls -1 $realpath'
+  fi
+  source "$HOMEBREW_PREFIX/share/fzf-tab/fzf-tab.zsh"
+fi
+
 # Inline grey history suggestions. Accept with Right Arrow.
 if [ -f "$HOMEBREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ]; then
   source "$HOMEBREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
