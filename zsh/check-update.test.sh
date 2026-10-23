@@ -21,10 +21,10 @@ git -C "$work" config user.email test@example.com
 git -C "$work" config user.name test
 git -C "$work" config commit.gpgsign false
 git -C "$work" config tag.gpgsign false
-mkdir -p "$work/zsh/linux"
-printf 'old\n' >"$work/zsh/linux/.zshrc"
-git -C "$work" add zsh/linux/.zshrc
-git -C "$work" commit -q -m 'feat(zsh): initial zshrc'
+mkdir -p "$work/zsh"
+printf 'old\n' >"$work/zsh/init.zsh"
+git -C "$work" add zsh/init.zsh
+git -C "$work" commit -q -m 'feat(zsh): initial init.zsh'
 old=$(git -C "$work" rev-parse HEAD)
 
 state="$work/state"
@@ -34,8 +34,8 @@ printf '%s\n' "$old" >"$state/sha"
 # Skip the daily GitHub/fetch path unless a test is exercising it.
 printf '%s\n' "$(date +%s)" >"$state/last_fetch"
 
-printf 'new plugin\n' >"$work/zsh/linux/.zshrc"
-git -C "$work" add zsh/linux/.zshrc
+printf 'new plugin\n' >"$work/zsh/init.zsh"
+git -C "$work" add zsh/init.zsh
 git -C "$work" commit -q -m 'feat(zsh): add a plugin you should copy'
 
 out=$(SAUCE_STATE_DIR="$state" bash "$root/zsh/check-update.sh" || true)
@@ -48,7 +48,7 @@ printf '%s\n' "$out" | grep -q 'feat(zsh): add a plugin you should copy' || {
   printf 'missing commit subject\n%s\n' "$out" >&2
   exit 1
 }
-printf '%s\n' "$out" | grep -q 'zsh/linux/.zshrc' || {
+printf '%s\n' "$out" | grep -q 'zsh/init.zsh' || {
   printf 'missing changed file\n%s\n' "$out" >&2
   exit 1
 }
@@ -129,18 +129,16 @@ out=$(SAUCE_STATE_DIR="$state" bash "$root/zsh/check-update.sh" || true)
   exit 1
 }
 
-# The clone is also where the repo gets edited, and install.sh copies the
-# working tree. Y must not install uncommitted work, nor snooze the update.
-# Untracked files only count in a dir install.sh copies whole ($state is not).
+# The clone is also where the repo gets edited, and Nix builds the working
+# tree. Y must not install uncommitted work, nor snooze the update.
 rm -f "$state/snooze" "$state/installed"
-for dirty in unstaged staged untracked; do
+for dirty in unstaged staged; do
   case "$dirty" in
-    unstaged) printf 'half done\n' >>"$work/zsh/linux/.zshrc" ;;
+    unstaged) printf 'half done\n' >>"$work/zsh/init.zsh" ;;
     staged)
-      printf 'half done\n' >>"$work/zsh/linux/.zshrc"
-      git -C "$work" add zsh/linux/.zshrc
+      printf 'half done\n' >>"$work/zsh/init.zsh"
+      git -C "$work" add zsh/init.zsh
       ;;
-    untracked) mkdir -p "$work/ssh" && printf 'Host draft\n' >"$work/ssh/config" ;;
   esac
   out=$(SAUCE_UPDATE_ANSWER=y SAUCE_STATE_DIR="$state" bash "$root/zsh/check-update.sh" || true)
   [ ! -f "$state/installed" ] || {
@@ -156,11 +154,12 @@ for dirty in unstaged staged untracked; do
     exit 1
   }
   git -C "$work" reset -q --hard
-  rm -rf "$work/ssh"
 done
+# Untracked files never reach a flake build, so they don't hold the update.
+mkdir -p "$work/ssh" && printf 'Host draft\n' >"$work/ssh/config"
 out=$(SAUCE_UPDATE_ANSWER=y SAUCE_STATE_DIR="$state" bash "$root/zsh/check-update.sh" || true)
 [ -f "$state/installed" ] || {
-  printf 'Y did not install once the tree was clean again\n%s\n' "$out" >&2
+  printf 'Y did not install with the tracked tree clean\n%s\n' "$out" >&2
   exit 1
 }
 
