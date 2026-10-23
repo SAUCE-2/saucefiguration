@@ -17,6 +17,9 @@ ohmyposh:
 direnv:
   - changed-files:
       - any-glob-to-any-file: direnv/**
+nix:
+  - changed-files:
+      - any-glob-to-any-file: [flake.nix, flake.lock, home.nix, checks.nix]
 github:
   - changed-files:
       - any-glob-to-any-file: .github/**

@@ -1,494 +1,193 @@
 #!/usr/bin/env bash
-# Self-check for install.sh helpers. Sources the function half only.
+# Self-check for install.sh helpers (sourced, function half only) and
+# ssh/merge-authorized-keys.sh. Writes only to a mktemp dir and runs no Nix.
 set -euo pipefail
 
 script_dir=$(CDPATH='' cd -- "$(dirname "$0")" && pwd)
+root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
 # shellcheck source=install.sh
 SAUCE_LIB_ONLY=1 . "$script_dir/install.sh"
-
-# Octal permission bits, e.g. 600. GNU stat takes -c, BSD (macOS) stat -f.
-file_mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
-
-[ "$(pkg_name pacman openssh-client)" = openssh ] || {
-  echo 'pkg_name pacman openssh-client' >&2
-  exit 1
-}
-[ "$(pkg_name apt-get fd)" = fd-find ] || {
-  echo 'pkg_name apt-get fd' >&2
-  exit 1
-}
-[ "$(pkg_name apt-get go)" = golang-go ] || {
-  echo 'pkg_name apt-get go' >&2
-  exit 1
-}
-[ "$(pkg_name dnf go)" = golang ] || {
-  echo 'pkg_name dnf go' >&2
-  exit 1
-}
-[ "$(pkg_name zypper micro)" = micro-editor ] || {
-  echo 'pkg_name zypper micro' >&2
-  exit 1
-}
-for pm in pacman apk; do
-  [ "$(pkg_name "$pm" gh)" = github-cli ] || {
-    echo "pkg_name $pm gh" >&2
-    exit 1
-  }
-done
-for pm in brew apt-get dnf zypper; do
-  [ "$(pkg_name "$pm" gh)" = gh ] || {
-    echo "pkg_name $pm gh" >&2
-    exit 1
-  }
-done
-for v in go1.24.2 go1.24 go1.25.3 go2.0; do
-  go_version_ok "$v" || {
-    echo "go_version_ok $v should pass" >&2
-    exit 1
-  }
-done
-for v in go1.19.8 go1.23.4 go1.9 devel garbage; do
-  go_version_ok "$v" && {
-    echo "go_version_ok $v should fail" >&2
-    exit 1
-  }
-done
-[ "$(pkg_name apk git-delta)" = delta ] || {
-  echo 'pkg_name apk git-delta' >&2
-  exit 1
-}
-[ "$(pkg_name apt-get git-delta)" = git-delta ] || {
-  echo 'pkg_name apt-get git-delta' >&2
-  exit 1
-}
-[ -z "$(pkg_name apt-get yq)" ] || {
-  echo 'pkg_name apt-get yq should be empty (Debian yq is the Python one)' >&2
-  exit 1
-}
-[ "$(pkg_name pacman yq)" = go-yq ] || {
-  echo 'pkg_name pacman yq' >&2
-  exit 1
-}
-[ "$(pkg_name apk yq)" = yq-go ] || {
-  echo 'pkg_name apk yq' >&2
-  exit 1
-}
-DRY_RUN=1 PM=apt-get install_pkg yq && {
-  echo 'install_pkg yq should refuse on apt-get' >&2
-  exit 1
-}
-[ "$(pkg_name pacman eza)" = eza ] || {
-  echo 'pkg_name passthrough' >&2
-  exit 1
-}
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-# is_wsl: a fake uname answers -s with $FAKE_S and -r with $FAKE_R.
-mkdir -p "$work/wsl"
-cat >"$work/wsl/uname" <<'EOF'
+# A fake uname answers -s with $FAKE_S, -r with $FAKE_R and -m with $FAKE_M.
+mkdir -p "$work/uname"
+cat >"$work/uname/uname" <<'EOF'
 #!/bin/sh
-case "$1" in -r) echo "$FAKE_R" ;; *) echo "$FAKE_S" ;; esac
+case "$1" in -r) echo "$FAKE_R" ;; -m) echo "$FAKE_M" ;; *) echo "$FAKE_S" ;; esac
 EOF
-chmod +x "$work/wsl/uname"
+chmod +x "$work/uname/uname"
+touch "$work/uname/WSLInterop"
+
 wsl_case() { # expect(0|1) uname-s uname-r WSL_DISTRO_NAME interop-file
   local got=0
-  PATH="$work/wsl:$PATH" FAKE_S=$2 FAKE_R=$3 WSL_DISTRO_NAME=$4 SAUCE_WSL_INTEROP=$5 is_wsl || got=1
+  PATH="$work/uname:$PATH" FAKE_S=$2 FAKE_R=$3 WSL_DISTRO_NAME=$4 SAUCE_WSL_INTEROP=$5 is_wsl || got=1
   [ "$got" = "$1" ] || {
     echo "is_wsl -s '$2' -r '$3' distro '$4' interop '$5': want $1, got $got" >&2
     exit 1
   }
 }
-touch "$work/wsl/WSLInterop"
-wsl_case 1 Linux 6.8.0-45-generic '' "$work/wsl/none"
-wsl_case 1 Darwin 23.6.0 Ubuntu "$work/wsl/WSLInterop"
-wsl_case 0 Linux 6.6.87.2-microsoft-standard-WSL2 '' "$work/wsl/none"
-wsl_case 0 Linux 4.4.0-19041-Microsoft '' "$work/wsl/none"
-wsl_case 0 Linux 6.8.0-45-generic Ubuntu "$work/wsl/none"
-wsl_case 0 Linux 6.8.0-45-generic '' "$work/wsl/WSLInterop"
-# Only the WSL list carries wslu.
-case "$packages" in *wslu*)
-  echo 'wslu belongs in wsl_packages, not packages' >&2
-  exit 1
-  ;;
-esac
-case "$wsl_packages" in *wslu:wslview*) ;; *)
-  echo 'wsl_packages lost wslu:wslview' >&2
-  exit 1
-  ;;
-esac
+wsl_case 1 Linux 6.8.0-45-generic '' "$work/uname/none"
+wsl_case 1 Darwin 23.6.0 Ubuntu "$work/uname/WSLInterop"
+wsl_case 0 Linux 6.6.87.2-microsoft-standard-WSL2 '' "$work/uname/none"
+wsl_case 0 Linux 4.4.0-19041-Microsoft '' "$work/uname/none"
+wsl_case 0 Linux 6.8.0-45-generic Ubuntu "$work/uname/none"
+wsl_case 0 Linux 6.8.0-45-generic '' "$work/uname/WSLInterop"
 
-printf '%s\n' '#!/bin/sh' 'echo ro,relatime' >"$work/findmnt"
-chmod +x "$work/findmnt"
-PATH="$work:$PATH" fs_readonly /var/lib/pacman || {
-  echo 'expected read-only mount' >&2
-  exit 1
+profile_case() { # want uname-s uname-m uname-r ('' = no profile)
+  local got
+  got=$(PATH="$work/uname:$PATH" FAKE_S=$2 FAKE_M=$3 FAKE_R=$4 WSL_DISTRO_NAME='' \
+    SAUCE_WSL_INTEROP="$work/uname/none" profile_name) || got=''
+  [ "$got" = "$1" ] || {
+    echo "profile_name $2 $3 $4: want '$1', got '$got'" >&2
+    exit 1
+  }
 }
-PATH="$work:$PATH" pm_can_write pacman && {
-  echo 'pacman should not write on a read-only db' >&2
-  exit 1
-}
+profile_case x86_64-linux Linux x86_64 6.8.0-45-generic
+profile_case aarch64-linux Linux aarch64 6.8.0-45-generic
+profile_case x86_64-linux-wsl Linux x86_64 6.6.87.2-microsoft-standard-WSL2
+profile_case aarch64-darwin Darwin arm64 23.6.0
+profile_case '' Darwin x86_64 23.6.0
+profile_case '' Linux riscv64 6.8.0
+profile_case '' FreeBSD amd64 14.1
 
-printf '%s\n' '#!/bin/sh' 'echo rw,relatime' >"$work/findmnt"
-PATH="$work:$PATH" fs_readonly /var/lib/pacman && {
-  echo 'expected writable mount' >&2
-  exit 1
-}
-PATH="$work:$PATH" pm_can_write pacman || {
-  echo 'pacman should write on a writable db' >&2
-  exit 1
-}
+# Every profile_name answer must exist in flake.nix, and the reverse.
+for p in x86_64-linux aarch64-linux x86_64-linux-wsl aarch64-linux-wsl aarch64-darwin; do
+  case "$p" in
+    *-wsl) sys=${p%-wsl} ;;
+    *) sys=$p ;;
+  esac
+  grep -q "\"$sys\"" "$root/flake.nix" || {
+    echo "flake.nix has no system $sys for profile $p" >&2
+    exit 1
+  }
+done
 
-# SteamOS: the mount says rw, but steamos-readonly flips the btrfs subvolume.
-printf '%s\n' '#!/bin/sh' 'case "$*" in *TARGET*) echo / ;; *) echo rw,relatime ;; esac' >"$work/findmnt"
-printf '%s\n' '#!/bin/sh' '[ "$*" = "property get -ts / ro" ] && echo ro=true' >"$work/btrfs"
-chmod +x "$work/btrfs"
-PATH="$work:$PATH" fs_readonly /var/lib/pacman || {
-  echo 'expected read-only btrfs subvolume' >&2
+# Legacy files: moved aside once, and ~/.gitconfig comes back as the
+# machine-local file that later runs leave alone.
+lh="$work/legacy"
+mkdir -p "$lh"
+printf '[user]\n\tname = old\n' >"$lh/.gitconfig"
+printf 'set -g mouse on\n' >"$lh/.tmux.conf"
+HOME="$lh" retire_legacy_files 20260101000000 2>/dev/null
+[ "$(cat "$lh/.gitconfig.bak.20260101000000")" = "$(printf '[user]\n\tname = old')" ] || {
+  echo 'retire_legacy_files lost the old .gitconfig' >&2
   exit 1
 }
-printf '%s\n' '#!/bin/sh' 'echo ro=false' >"$work/btrfs"
-PATH="$work:$PATH" fs_readonly /var/lib/pacman && {
-  echo 'expected writable btrfs subvolume' >&2
+grep -q '^# saucefiguration: machine-local' "$lh/.gitconfig" || {
+  echo 'retire_legacy_files did not leave a machine-local .gitconfig' >&2
   exit 1
 }
-rm "$work/btrfs"
-
-pm_can_write brew || {
-  echo 'brew should always look writable' >&2
+[ -f "$lh/.tmux.conf.bak.20260101000000" ] && [ ! -e "$lh/.tmux.conf" ] || {
+  echo 'retire_legacy_files did not move .tmux.conf aside' >&2
   exit 1
 }
-
-mkdir -p "$work/home/.local/share/zsh-autosuggestions"
-touch "$work/home/.local/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
-# find_plugin looks in $HOMEBREW_PREFIX first, and the darwin .zshrc exports
-# it. Clear it so a brew-installed copy on this machine can't answer.
-got=$(HOMEBREW_PREFIX='' HOME="$work/home" find_plugin zsh-autosuggestions) || {
-  echo 'find_plugin missed ~/.local/share' >&2
+printf '[credential]\n\thelper = store\n' >>"$lh/.gitconfig"
+err=$(HOME="$lh" retire_legacy_files 20260202000000 2>&1)
+[ -z "$err" ] && [ ! -e "$lh/.gitconfig.bak.20260202000000" ] || {
+  printf 're-run touched the machine-local .gitconfig\n%s\n' "$err" >&2
   exit 1
 }
-[ "$got" = "$work/home/.local/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ] || {
-  echo "find_plugin path: $got" >&2
+# A symlink (someone else's dotfile manager) is not ours to move.
+sh2="$work/legacy2"
+mkdir -p "$sh2"
+printf 'x\n' >"$work/other.conf"
+ln -s "$work/other.conf" "$sh2/.tmux.conf"
+HOME="$sh2" retire_legacy_files 20260101000000 2>/dev/null
+[ -L "$sh2/.tmux.conf" ] || {
+  echo 'retire_legacy_files moved a symlink' >&2
   exit 1
 }
-mkdir -p "$work/brew/share/zsh-autosuggestions"
-touch "$work/brew/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
-got=$(HOMEBREW_PREFIX="$work/brew" HOME="$work/home" find_plugin zsh-autosuggestions)
-[ "$got" = "$work/brew/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ] || {
-  echo "find_plugin should prefer Homebrew's copy: $got" >&2
-  exit 1
-}
-
-# fzf-tab's clone and Homebrew's pkgshare both put fzf-tab.zsh at the top.
-mkdir -p "$work/home/.local/share/fzf-tab"
-touch "$work/home/.local/share/fzf-tab/fzf-tab.zsh"
-got=$(HOMEBREW_PREFIX='' HOME="$work/home" find_plugin fzf-tab)
-[ "$got" = "$work/home/.local/share/fzf-tab/fzf-tab.zsh" ] || {
-  echo "find_plugin fzf-tab path: $got" >&2
-  exit 1
-}
-# Distro managers don't carry fzf-tab: skip them so install_user clones it.
-PM=pacman install_pkg fzf-tab && {
-  echo 'install_pkg fzf-tab should defer to install_user off Homebrew' >&2
+# Dry run: says what it would move, moves nothing.
+dh="$work/legacy-dry"
+mkdir -p "$dh"
+printf 'old\n' >"$dh/.gitconfig"
+out=$(HOME="$dh" DRY_RUN=1 retire_legacy_files 20260101000000 2>&1)
+printf '%s\n' "$out" | grep -q "would run: mv $dh/.gitconfig" && [ "$(cat "$dh/.gitconfig")" = old ] || {
+  printf 'dry-run retire_legacy_files\n%s\n' "$out" >&2
   exit 1
 }
 
-mkdir -p "$work/yqpy" "$work/yqgo"
-printf '#!/bin/sh\necho yq 3.4.3\n' >"$work/yqpy/yq"
-printf '#!/bin/sh\necho "yq (https://github.com/mikefarah/yq/) version v4.45.1"\n' >"$work/yqgo/yq"
-chmod +x "$work/yqpy/yq" "$work/yqgo/yq"
-PATH="$work/yqpy:/usr/bin:/bin" have_tool yq && {
-  echo 'have_tool should reject the Python yq' >&2
-  exit 1
-}
-PATH="$work/yqgo:/usr/bin:/bin" have_tool yq || {
-  echo "have_tool should accept mikefarah's yq" >&2
-  exit 1
-}
-
-out=$(DRY_RUN=1 install_user eza)
-printf '%s\n' "$out" | grep -q 'would install eza into ~/.local' || {
-  printf 'missing dry-run line\n%s\n' "$out" >&2
-  exit 1
-}
-
-out=$(PATH=/usr/bin:/bin DRY_RUN=1 install_webi dotenv-linter)
-printf '%s\n' "$out" | grep -q 'https://webi.sh/dotenv-linter@stable' || {
-  printf 'install_webi dry-run missed the webinstall URL\n%s\n' "$out" >&2
-  exit 1
-}
-mkdir -p "$work/bin"
-printf '#!/bin/sh\necho dotenv-linter 1\n' >"$work/bin/dotenv-linter"
-chmod +x "$work/bin/dotenv-linter"
-out=$(PATH="$work/bin:/usr/bin:/bin" DRY_RUN=1 install_webi dotenv-linter)
-printf '%s\n' "$out" | grep -q 'dotenv-linter already installed' || {
-  printf 'install_webi should skip an existing binary\n%s\n' "$out" >&2
-  exit 1
-}
-
-weh="$work/weh"
-mkdir -p "$weh"
-printf 'keep\n' >"$weh/.bashrc"
-HOME="$weh" webi_rc_snapshot
-printf '\nenvman\n' >>"$weh/.bashrc"
-printf 'created\n' >"$weh/.zshrc"
-HOME="$weh" webi_rc_restore
-[ "$(cat "$weh/.bashrc")" = 'keep' ] || {
-  echo 'webi_rc_restore did not put .bashrc back' >&2
-  exit 1
-}
-[ ! -e "$weh/.zshrc" ] || {
-  echo 'webi_rc_restore left a .zshrc webi created' >&2
-  exit 1
-}
-
-src="$work/src.txt"
-dest="$work/dest.txt"
-printf 'new\n' >"$src"
-
-copy_file "$src" "$dest"
-[ "$(cat "$dest")" = new ] || {
-  echo 'copy_file did not create dest' >&2
-  exit 1
-}
-
-# Identical dest: no warning, leave it.
-err=$(copy_file "$src" "$dest" 2>&1 >/dev/null) || true
-[ -z "$err" ] || {
-  printf 'identical dest should be silent\n%s\n' "$err" >&2
-  exit 1
-}
-ls "$dest".bak.* >/dev/null 2>&1 && {
-  echo 'identical dest should not leave a backup' >&2
-  exit 1
-}
-
-printf 'old\n' >"$dest"
-err=$(copy_file "$src" "$dest" 2>&1 >/dev/null) || true
-printf '%s\n' "$err" | grep -q "replacing $dest" || {
-  printf 'missing replacement warning\n%s\n' "$err" >&2
-  exit 1
-}
-[ "$(cat "$dest")" = new ] || {
-  echo 'copy_file did not replace dest' >&2
-  exit 1
-}
-# The old dest is kept next to it, and the warning says where.
-backup=$(printf '%s\n' "$err" | sed -n 's/.*(backup: \(.*\))$/\1/p')
-case "$backup" in
-  "$dest".bak.[0-9]*) ;;
+# Leftovers are listed, never deleted.
+oh="$work/leftovers"
+mkdir -p "$oh/.nvm" "$oh/.local/bin"
+touch "$oh/.local/bin/eza"
+err=$(HOME="$oh" report_leftovers 2>&1)
+case "$err" in
+  *'/.nvm'*'/.local/bin/eza'*) ;;
   *)
-    printf 'warning should name a %s.bak.<time> backup\n%s\n' "$dest" "$err" >&2
+    printf 'report_leftovers missed a leftover\n%s\n' "$err" >&2
     exit 1
     ;;
 esac
-[ "$(cat "$backup")" = old ] || {
-  echo 'backup does not hold the old dest' >&2
+[ -d "$oh/.nvm" ] && [ -f "$oh/.local/bin/eza" ] || {
+  echo 'report_leftovers deleted something' >&2
+  exit 1
+}
+err=$(HOME="$work/empty-home" report_leftovers 2>&1)
+[ -z "$err" ] || {
+  printf 'report_leftovers spoke with nothing left over\n%s\n' "$err" >&2
   exit 1
 }
 
-# A shell sourcing ~/.zshrc runs the update, which copies a new .zshrc while
-# zsh is still reading the old one. Replace the file, don't rewrite it in place.
-printf 'old\n' >"$dest"
-exec 3<"$dest"
-copy_file "$src" "$dest" 2>/dev/null
-[ "$(cat <&3)" = old ] || {
-  echo 'copy_file rewrote dest in place under an open reader' >&2
-  exit 1
-}
-exec 3<&-
-
-printf 'old\n' >"$dest"
-rm -f "$dest".bak.*
-err=$(DRY_RUN=1 copy_file "$src" "$dest" 2>&1) || true
-printf '%s\n' "$err" | grep -q "replacing $dest" || {
-  printf 'dry-run missing replacement warning\n%s\n' "$err" >&2
-  exit 1
-}
-printf '%s\n' "$err" | grep -q "would copy $src -> $dest" || {
-  printf 'dry-run missing would-copy\n%s\n' "$err" >&2
-  exit 1
-}
-[ "$(cat "$dest")" = old ] || {
-  echo 'dry-run replaced dest' >&2
-  exit 1
-}
-ls "$dest".bak.* >/dev/null 2>&1 && {
-  echo 'dry-run left a backup' >&2
+# The stamp check-update.sh reads.
+git -C "$work" init -q stamprepo
+git -C "$work/stamprepo" -c user.email=t@example.com -c user.name=t -c commit.gpgsign=false \
+  commit -q --allow-empty -m init
+SAUCE_ROOT="$work/stamprepo" SAUCE_STATE_DIR="$work/state" record_install_rev
+[ "$(cat "$work/state/repo")" = "$work/stamprepo" ] &&
+  [ "$(cat "$work/state/sha")" = "$(git -C "$work/stamprepo" rev-parse HEAD)" ] || {
+  echo 'record_install_rev wrote the wrong stamp' >&2
   exit 1
 }
 
-other="$work/other.txt"
-printf 'other\n' >"$other"
-ln -s "$other" "$work/link.txt"
-copy_file "$src" "$work/link.txt" 2>/dev/null
-[ ! -L "$work/link.txt" ] || {
-  echo 'copy_file left dest as a symlink' >&2
+# Whole script, dry run, on a machine without Nix: it offers to install Nix
+# and changes nothing. PATH holds only stubs and basic tools.
+stubs="$work/stubs"
+mkdir -p "$stubs"
+for cmd in bash sh dirname date id cat; do
+  ln -s "$(command -v "$cmd")" "$stubs/$cmd"
+done
+cat >"$stubs/uname" <<'EOF'
+#!/bin/sh
+case "$1" in -m) echo x86_64 ;; -r) echo 6.8.0-45-generic ;; *) echo Linux ;; esac
+EOF
+chmod +x "$stubs/uname"
+dry_home="$work/dryhome"
+mkdir -p "$dry_home"
+status=0
+out=$(env -i HOME="$dry_home" PATH="$stubs" SAUCE_WSL_INTEROP="$work/uname/none" SAUCE_NIX_PROFILE_SH=/nonexistent \
+  "$BASH" "$script_dir/install.sh" --dry-run 2>&1) || status=$?
+[ "$status" = 0 ] || {
+  printf 'dry run without Nix should exit 0, got %s\n%s\n' "$status" "$out" >&2
   exit 1
 }
-[ "$(cat "$work/link.txt")" = new ] || {
-  echo 'copy_file did not replace symlink' >&2
-  exit 1
-}
-[ "$(cat "$other")" = other ] || {
-  echo 'copy_file wrote through the symlink' >&2
-  exit 1
-}
-
-mode_dest="$work/mode.txt"
-copy_file "$src" "$mode_dest" 600
-[ "$(file_mode "$mode_dest")" = 600 ] || {
-  echo "copy_file mode: $(file_mode "$mode_dest")" >&2
-  exit 1
-}
-
-# tmux plugins: clone tpm once, then install the declared plugins.
-th="$work/tmuxhome"
-mkdir -p "$th" "$work/tmuxbin" "$work/notmux"
-printf '#!/bin/sh\n' >"$work/tmuxbin/tmux"
-chmod +x "$work/tmuxbin/tmux"
-out=$(HOME="$th" PATH="$work/tmuxbin" DRY_RUN=1 install_tmux_plugins 2>&1)
-printf '%s\n' "$out" | grep -q "would run: git clone --depth 1 https://github.com/tmux-plugins/tpm $th/.tmux/plugins/tpm" || {
-  printf 'tmux plugins dry-run missed the tpm clone\n%s\n' "$out" >&2
-  exit 1
-}
-printf '%s\n' "$out" | grep -q "would run: $th/.tmux/plugins/tpm/bin/install_plugins" || {
-  printf 'tmux plugins dry-run missed install_plugins\n%s\n' "$out" >&2
-  exit 1
-}
-mkdir -p "$th/.tmux/plugins/tpm"
-printf '#!/bin/sh\n' >"$th/.tmux/plugins/tpm/tpm"
-chmod +x "$th/.tmux/plugins/tpm/tpm"
-out=$(HOME="$th" PATH="$work/tmuxbin" DRY_RUN=1 install_tmux_plugins 2>&1)
-printf '%s\n' "$out" | grep -q 'git clone' && {
-  printf 'tmux plugins should not re-clone tpm\n%s\n' "$out" >&2
-  exit 1
-}
-printf '%s\n' "$out" | grep -q 'install_plugins' || {
-  printf 'tmux plugins should still install plugins with tpm present\n%s\n' "$out" >&2
-  exit 1
-}
-out=$(HOME="$th" PATH="$work/notmux" DRY_RUN=1 install_tmux_plugins 2>&1)
-printf '%s\n' "$out" | grep -q 'install_plugins' && {
-  printf 'tmux plugins should skip without tmux\n%s\n' "$out" >&2
-  exit 1
-}
-
-# A real run with a tmux server already up, as when install.sh runs from a
-# shell inside tmux. That server never ran tpm, so it has no
-# TMUX_PLUGIN_MANAGER_PATH; tpm's install_plugins asks for it and aborts.
-# The stub tpm does what the real one does with that variable. Needs real
-# tmux (CI installs it); the dry runs above cannot catch this.
-if command -v tmux >/dev/null 2>&1; then
-  rh="$work/tmuxreal"
-  tpm_dir="$rh/.tmux/plugins/tpm"
-  mkdir -p "$tpm_dir/bin"
-  cp "$script_dir/../tmux/.tmux.conf" "$rh/.tmux.conf"
-  # shellcheck disable=SC2016
-  printf '#!/bin/sh\ntmux set-environment -g TMUX_PLUGIN_MANAGER_PATH "$HOME/.tmux/plugins/"\n' >"$tpm_dir/tpm"
-  # shellcheck disable=SC2016
-  printf '#!/bin/sh\ntmux start-server \\; show-environment -g TMUX_PLUGIN_MANAGER_PATH || exit 1\ntouch "$HOME/plugins-installed"\n' >"$tpm_dir/bin/install_plugins"
-  chmod +x "$tpm_dir/tpm" "$tpm_dir/bin/install_plugins"
-  # Short path: tmux socket paths are capped near 104 bytes.
-  usock=$(mktemp -d /tmp/sauce-test-tmux.XXXXXX)
-  HOME="$rh" TMUX_TMPDIR="$usock" tmux -f /dev/null new-session -d -s user
-  user_tmux="$usock/tmux-$(id -u)/default"
-  out=$(HOME="$rh" TMUX="$user_tmux,1,0" TMUX_TMPDIR="$usock" failed='' DRY_RUN=0 \
-    bash -c 'SAUCE_LIB_ONLY=1 . "$1"; install_tmux_plugins; [ -z "$failed" ]' _ "$script_dir/install.sh" 2>&1) || {
-    tmux -S "$user_tmux" kill-server 2>/dev/null || true
-    rm -rf "$usock"
-    printf 'tmux plugins failed with a tmux server already running\n%s\n' "$out" >&2
+case "$out" in
+  *'Profile x86_64-linux'*'would run: '*'install.determinate.systems/nix'*) ;;
+  *)
+    printf 'dry run should name the profile and the Nix installer\n%s\n' "$out" >&2
     exit 1
-  }
-  user_alive=0
-  tmux -S "$user_tmux" has-session -t user 2>/dev/null && user_alive=1
-  tmux -S "$user_tmux" kill-server 2>/dev/null || true
-  rm -rf "$usock"
-  [ -e "$rh/plugins-installed" ] || {
-    printf 'tmux plugins: install_plugins did not run\n%s\n' "$out" >&2
-    exit 1
-  }
-  [ "$user_alive" = 1 ] || {
-    echo "tmux plugins killed the user's tmux server" >&2
-    exit 1
-  }
-fi
+    ;;
+esac
+[ -z "$(ls -A "$dry_home")" ] || {
+  echo "dry run wrote to $dry_home" >&2
+  exit 1
+}
 
-# Full set of repo configs into a fake $HOME.
-tree="$work/repo"
-home="$work/home"
-mkdir -p "$tree/zsh/linux" "$tree/zsh/darwin" "$tree/tmux" "$tree/git" "$tree/ohmyposh" "$tree/direnv" "$tree/ssh"
-printf 'zshrc\n' >"$tree/zsh/linux/.zshrc"
-printf 'zshrc\n' >"$tree/zsh/darwin/.zshrc"
-printf 'tmux\n' >"$tree/tmux/.tmux.conf"
-printf 'gitconfig\n' >"$tree/git/.gitconfig"
-printf 'ignore\n' >"$tree/git/.gitignore_global"
-printf 'omp\n' >"$tree/ohmyposh/theme.omp.json"
-printf 'direnv\n' >"$tree/direnv/direnv.toml"
-printf 'sshconfig\n' >"$tree/ssh/config"
-printf 'keys\n' >"$tree/ssh/authorized_keys"
-printf 'signers\n' >"$tree/ssh/allowed_signers"
-mkdir -p "$home"
-printf 'old-zshrc\n' >"$home/.zshrc"
-
-err=$(HOME="$home" SAUCE_ROOT="$tree" install_dotfiles 2>&1 >/dev/null) || true
-printf '%s\n' "$err" | grep -q "replacing $home/.zshrc" || {
-  printf 'install_dotfiles missing zshrc replacement warning\n%s\n' "$err" >&2
-  exit 1
-}
-[ "$(cat "$home/.zshrc")" = zshrc ] || {
-  echo 'install_dotfiles missed .zshrc' >&2
-  exit 1
-}
-[ "$(cat "$home/.tmux.conf")" = tmux ] || {
-  echo 'install_dotfiles missed .tmux.conf' >&2
-  exit 1
-}
-[ "$(cat "$home/.gitconfig")" = gitconfig ] || {
-  echo 'install_dotfiles missed .gitconfig' >&2
-  exit 1
-}
-[ "$(cat "$home/.gitignore_global")" = ignore ] || {
-  echo 'install_dotfiles missed .gitignore_global' >&2
-  exit 1
-}
-[ "$(cat "$home/.config/ohmyposh/theme.omp.json")" = omp ] || {
-  echo 'install_dotfiles missed ohmyposh theme' >&2
-  exit 1
-}
-[ "$(cat "$home/.config/direnv/direnv.toml")" = direnv ] || {
-  echo 'install_dotfiles missed direnv config' >&2
-  exit 1
-}
-[ "$(cat "$home/.ssh/config")" = sshconfig ] || {
-  echo 'install_dotfiles missed ssh config' >&2
-  exit 1
-}
-[ "$(cat "$home/.ssh/authorized_keys")" = keys ] || {
-  echo 'install_dotfiles missed authorized_keys' >&2
-  exit 1
-}
-[ "$(cat "$home/.ssh/allowed_signers")" = signers ] || {
-  echo 'install_dotfiles missed allowed_signers' >&2
-  exit 1
-}
-[ "$(file_mode "$home/.ssh")" = 700 ] || {
-  echo "ssh dir mode: $(file_mode "$home/.ssh")" >&2
-  exit 1
-}
-[ "$(file_mode "$home/.ssh/config")" = 600 ] || {
-  echo "ssh config mode: $(file_mode "$home/.ssh/config")" >&2
+status=0
+"$BASH" "$script_dir/install.sh" --bogus >/dev/null 2>&1 || status=$?
+[ "$status" = 64 ] || {
+  echo "unknown flag should exit 64, got $status" >&2
   exit 1
 }
 
 # authorized_keys on a server: keys only it has survive, after the repo's.
 # The repo's line for a key replaces an old one with another comment.
-aktree="$work/aktree"
-cp -R "$tree" "$aktree"
+merge="$root/ssh/merge-authorized-keys.sh"
 printf '%s\n' \
   'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIrepo1 s@desktop' \
-  'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIrepo2 s@macbook' >"$aktree/ssh/authorized_keys"
+  'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIrepo2 s@macbook' >"$work/repo_keys"
 akh="$work/akhome"
 mkdir -p "$akh/.ssh"
 printf '%s\n' \
@@ -497,7 +196,7 @@ printf '%s\n' \
   'from="10.0.0.0/8",no-pty ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIserver deploy@ci' >"$akh/.ssh/authorized_keys"
 chmod 600 "$akh/.ssh/authorized_keys"
 old_keys=$(cat "$akh/.ssh/authorized_keys")
-HOME="$akh" SAUCE_ROOT="$aktree" install_dotfiles >/dev/null 2>&1 || true
+bash "$merge" "$work/repo_keys" "$akh/.ssh/authorized_keys" >/dev/null
 want=$(printf '%s\n' \
   'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIrepo1 s@desktop' \
   'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIrepo2 s@macbook' \
@@ -523,110 +222,20 @@ for f in "$ak_backup" "$akh/.ssh/authorized_keys"; do
   }
 done
 # Re-run: the merge is stable, so nothing is replaced or backed up again.
-err=$(HOME="$akh" SAUCE_ROOT="$aktree" install_dotfiles 2>&1 >/dev/null) || true
-printf '%s\n' "$err" | grep -q 'replacing' && {
-  printf 're-run should replace nothing\n%s\n' "$err" >&2
-  exit 1
-}
-
-# Real clone: every file in git/, ssh/, ohmyposh/, direnv/ must land in $HOME.
-# zsh/ is only the platform .zshrc; install.sh and tests stay in the clone.
-real_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
-real_home="$work/realhome"
-mkdir -p "$real_home"
-HOME="$real_home" SAUCE_ROOT="$real_root" install_dotfiles >/dev/null
-case "$(uname -s)" in
-  Darwin) platform=darwin ;;
-  *) platform=linux ;;
-esac
-cmp -s "$real_root/zsh/$platform/.zshrc" "$real_home/.zshrc" || {
-  echo "install_dotfiles missed real zsh/$platform/.zshrc" >&2
-  exit 1
-}
-cmp -s "$real_root/tmux/.tmux.conf" "$real_home/.tmux.conf" || {
-  echo 'install_dotfiles missed real tmux/.tmux.conf' >&2
-  exit 1
-}
-for src in "$real_root/git"/* "$real_root/git"/.[!.]*; do
-  [ -f "$src" ] || continue
-  cmp -s "$src" "$real_home/$(basename "$src")" || {
-    echo "install_dotfiles missed real git/$(basename "$src")" >&2
-    exit 1
-  }
+out=$(bash "$merge" "$work/repo_keys" "$akh/.ssh/authorized_keys")
+backups=0
+for f in "$akh/.ssh"/authorized_keys.bak.*; do
+  backups=$((backups + 1))
 done
-for src in "$real_root/ohmyposh"/* "$real_root/ohmyposh"/.[!.]*; do
-  [ -f "$src" ] || continue
-  cmp -s "$src" "$real_home/.config/ohmyposh/$(basename "$src")" || {
-    echo "install_dotfiles missed real ohmyposh/$(basename "$src")" >&2
-    exit 1
-  }
-done
-for src in "$real_root/direnv"/* "$real_root/direnv"/.[!.]*; do
-  [ -f "$src" ] || continue
-  cmp -s "$src" "$real_home/.config/direnv/$(basename "$src")" || {
-    echo "install_dotfiles missed real direnv/$(basename "$src")" >&2
-    exit 1
-  }
-done
-for src in "$real_root/ssh"/* "$real_root/ssh"/.[!.]*; do
-  [ -f "$src" ] || continue
-  cmp -s "$src" "$real_home/.ssh/$(basename "$src")" || {
-    echo "install_dotfiles missed real ssh/$(basename "$src")" >&2
-    exit 1
-  }
-done
-
-# Whole run on a Linux box with no sudo rights and every installer script
-# failing. PATH holds only these stubs and basic tools, so nothing real runs.
-# Configs must still land and the rev be stamped, or the update prompt asks
-# again in every new shell.
-stubs="$work/stubs"
-mkdir -p "$stubs"
-for cmd in bash sh tr mktemp tar find mkdir mv chmod rm cp cmp dirname basename awk date; do
-  ln -s "$(command -v "$cmd")" "$stubs/$cmd"
-done
-cat >"$stubs/uname" <<'EOF'
-#!/bin/sh
-case "$1" in -m) echo x86_64 ;; *) echo Linux ;; esac
-EOF
-printf '%s\n' '#!/bin/sh' 'echo 1000' >"$stubs/id"
-printf '%s\n' '#!/bin/sh' 'echo "sudo: a password is required" >&2' 'exit 1' >"$stubs/sudo"
-printf '%s\n' '#!/bin/sh' 'exit 100' >"$stubs/apt-get"
-# A script that fails, for the installers piped from curl into a shell.
-printf '%s\n' '#!/bin/sh' 'echo "exit 7"' 'exit 22' >"$stubs/curl"
-printf '%s\n' '#!/bin/sh' 'case "$*" in *rev-parse*) echo 1111111111111111111111111111111111111111 ;; *) exit 128 ;; esac' >"$stubs/git"
-# Only the scripts: chmod follows the symlinks above to the real tools, which
-# a non-root user (CI) may not change.
-chmod +x "$stubs/uname" "$stubs/id" "$stubs/sudo" "$stubs/apt-get" "$stubs/curl" "$stubs/git"
-fail_home="$work/failhome"
-mkdir -p "$fail_home"
-status=0
-out=$(env -i HOME="$fail_home" PATH="$stubs" SAUCE_ROOT="$tree" SAUCE_STATE_DIR="$work/failstate" \
-  SAUCE_WSL_INTEROP="$work/wsl/none" "$BASH" "$script_dir/install.sh" 2>&1) || status=$?
-[ "$status" = 1 ] || {
-  printf 'failed install should exit 1, got %s\n%s\n' "$status" "$out" >&2
+[ -z "$out" ] && [ "$backups" = 1 ] || {
+  printf 're-run should change nothing\n%s\n' "$out" >&2
   exit 1
 }
-[ "$(cat "$fail_home/.zshrc" 2>/dev/null)" = zshrc ] || {
-  printf 'failed install skipped the configs\n%s\n' "$out" >&2
-  exit 1
-}
-[ "$(cat "$work/failstate/sha" 2>/dev/null)" = 1111111111111111111111111111111111111111 ] || {
-  printf 'failed install did not stamp the rev\n%s\n' "$out" >&2
-  exit 1
-}
-printf '%s\n' "$out" | grep -q 'apt-get update, Oh My Zsh install, nvm install, Oh My Posh install\. Configs are copied' || {
-  printf 'missing summary of failed steps\n%s\n' "$out" >&2
-  exit 1
-}
-# No sudo still falls back to ~/.local.
-printf '%s\n' "$out" | grep -q 'Installing eza into ~/.local/bin' || {
-  printf 'no ~/.local fallback without sudo\n%s\n' "$out" >&2
-  exit 1
-}
-# Plain Linux: WSL-only packages are neither tried nor reported missing.
-printf '%s\n' "$out" | grep -q 'wslu\|WSL' && {
-  printf 'plain Linux run mentioned WSL packages\n%s\n' "$out" >&2
+# No authorized_keys yet: the repo's keys, no backup.
+fresh="$work/akfresh/.ssh/authorized_keys"
+bash "$merge" "$work/repo_keys" "$fresh" >/dev/null
+[ "$(cat "$fresh")" = "$(cat "$work/repo_keys")" ] && [ -n "$(find "$fresh" -perm 600)" ] || {
+  echo 'fresh authorized_keys is wrong' >&2
   exit 1
 }
 

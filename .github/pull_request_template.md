@@ -7,6 +7,6 @@
 
 ## Checked
 
-- [ ] CI is green (tests, shellcheck, `zsh -n`, on Linux and macOS)
-- [ ] `darwin/` and `linux/` `.zshrc` still in step, or the difference is platform-specific
-- [ ] New `.zshrc` tools are in `install.sh`'s `packages` list and guarded
+- [ ] CI is green (`nix flake check`, script tests and a real install, on Linux and macOS)
+- [ ] New tools come from Nix (`home.packages` in `home.nix` or a `programs.*` module)
+- [ ] macOS-only or WSL-only behaviour is conditional, not a separate copy

@@ -81,7 +81,7 @@ count=$(git_c rev-list --count $ranges 2>/dev/null) || count=0
 msg "It's time to update! You can do that by running \`$repo/zsh/install.sh\`"
 
 echo
-msg "$count new commit(s) since last install. Re-run the installer to copy them:"
+msg "$count new commit(s) since last install. Re-run the installer to apply them:"
 echo
 # shellcheck disable=SC2086
 git_c --no-pager log -15 --format='  %h %s' $ranges
@@ -99,17 +99,16 @@ files=$(
   } | sort -u
 )
 if [ -n "$files" ]; then
-  printf '  files the installer will copy:\n'
+  printf '  changed files:\n'
   printf '%s\n' "$files" | sed 's/^/    /'
   echo
 fi
 
-# install.sh copies the working tree, not HEAD, and this clone is where the
-# repo gets edited. Don't let Enter install half-done work: tracked changes
-# (staged or not), or new files in the dirs install.sh copies whole. No snooze,
-# so the prompt is back once the tree is clean.
-if ! git_c diff --quiet HEAD -- ||
-  [ -n "$(git_c ls-files --others --exclude-standard -- git ohmyposh ssh)" ]; then
+# Nix builds the flake from the working tree's tracked files, not HEAD, and
+# this clone is where the repo gets edited. Don't let Enter install half-done
+# work: tracked changes, staged or not. (Untracked files never reach the
+# build.) No snooze, so the prompt is back once the tree is clean.
+if ! git_c diff --quiet HEAD --; then
   msg "the clone has uncommitted changes; commit or stash them, then run \`$repo/zsh/install.sh\`"
   exit 0
 fi

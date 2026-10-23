@@ -1,7 +1,6 @@
-# The checks from CLAUDE.md, on Linux and on macOS. macOS runs the tests
-# under Apple's /bin/bash 3.2, the oldest bash the scripts must support.
-# The tests write only to mktemp dirs, never the real $HOME, and run no
-# package manager, so the runner's own config is left alone.
+# The checks from CLAUDE.md, on Linux and on macOS, then a real install on
+# the (throwaway) runner. macOS runs the script tests under Apple's
+# /bin/bash 3.2: install.sh runs there before Nix exists.
 name: CI
 
 on:
@@ -21,10 +20,11 @@ defaults:
     shell: bash
 
 jobs:
+  # The job names are the required checks in .github/settings.sh.
   checks:
     name: checks (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -38,22 +38,17 @@ jobs:
         with:
           persist-credentials: false
 
-      # tmux: install.test.sh runs tpm's install step against a real server.
-      - name: Install zsh, shellcheck and tmux
-        if: runner.os == 'Linux'
-        run: |
-          pkgs=()
-          command -v zsh >/dev/null || pkgs+=(zsh)
-          command -v shellcheck >/dev/null || pkgs+=(shellcheck)
-          command -v tmux >/dev/null || pkgs+=(tmux)
-          if [ "${#pkgs[@]}" -gt 0 ]; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq --no-install-recommends "${pkgs[@]}"
-          fi
+      - uses: cachix/install-nix-action@v31
 
-      - name: Install tmux
-        if: runner.os == 'macOS'
-        run: command -v tmux >/dev/null || brew install tmux
+      # Builds this runner's profiles and runs checks.nix: the zshrc
+      # startup and plugin-order checks, nixfmt and shellcheck.
+      - name: nix flake check
+        run: nix flake check -L
+
+      # The other platforms' profiles, evaluated but not built.
+      - name: nix flake check (all systems)
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        run: nix flake check --all-systems --no-build
 
       # Homebrew's bash comes first on the runner's PATH, and
       # check-update.test.sh runs `bash check-update.sh` through PATH.
@@ -64,12 +59,9 @@ jobs:
           ln -sf /bin/bash "$RUNNER_TEMP/bin/bash"
           echo "$RUNNER_TEMP/bin" >>"$GITHUB_PATH"
 
-      - name: Tool versions
+      - name: Bash version
         run: |
           ${{ matrix.bash }} --version
-          zsh --version
-          tmux -V
-          if [ "$RUNNER_OS" = Linux ]; then shellcheck --version; fi
           # The tests also call `bash` through PATH; it must be the same one.
           want=$(${{ matrix.bash }} --version | sed -n 1p)
           got=$(bash --version | sed -n 1p)
@@ -87,10 +79,27 @@ jobs:
         if: ${{ !cancelled() }}
         run: ${{ matrix.bash }} zsh/check-update.test.sh
 
-      - name: shellcheck
-        if: ${{ !cancelled() && runner.os == 'Linux' }}
-        run: shellcheck zsh/*.sh .github/*.sh
+      # The real thing, into the runner's $HOME, then a shell that must find
+      # every tool. Twice: the second run must change nothing.
+      - name: install.sh
+        run: |
+          ${{ matrix.bash }} zsh/install.sh
+          out=$(${{ matrix.bash }} zsh/install.sh 2>&1)
+          printf '%s\n' "$out"
+          if printf '%s\n' "$out" | grep -E 'in the way|moving the old|authorized_keys: updated'; then
+            echo "::error::second install.sh run changed files"
+            exit 1
+          fi
 
-      - name: zsh -n
-        if: ${{ !cancelled() }}
-        run: zsh -n zsh/linux/.zshrc zsh/darwin/.zshrc
+      - name: Shell finds the tools
+        env:
+          SAUCE_DISABLE_UPDATE_CHECK: 1
+        run: |
+          zsh=$HOME/.nix-profile/bin/zsh
+          "$zsh" -i -c '
+            for c in eza bat fd rg fzf zoxide jq yq direnv lazygit delta tmux micro gh oh-my-posh node pnpm go bootdev; do
+              (( $+commands[$c] )) || { print -u2 "missing $c"; exit 1; }
+            done
+            [[ $(git config --get gpg.format) == ssh ]] || { print -u2 "git config not applied"; exit 1; }
+            print ok
+          '

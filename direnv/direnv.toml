@@ -1,6 +1,0 @@
-# Copied to ~/.config/direnv/direnv.toml by zsh/install.sh.
-
-[global]
-# Load a directory's .env when it has no .envrc, the way omz's dotenv plugin
-# did. It still needs `direnv allow` first.
-load_dotenv = true
