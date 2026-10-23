@@ -5,6 +5,13 @@
       "Bash(bash zsh/install.test.sh)",
       "Bash(bash zsh/check-update.test.sh)",
       "Bash(bash zsh/install.sh --dry-run)",
+      "Bash(nix flake check:*)",
+      "Bash(nix flake show:*)",
+      "Bash(nix flake metadata:*)",
+      "Bash(nix build:*)",
+      "Bash(nix eval:*)",
+      "Bash(nix fmt:*)",
+      "Bash(nix develop -c shellcheck:*)",
       "Bash(shellcheck:*)",
       "Bash(zsh -n:*)",
       "Bash(git status:*)",
@@ -15,6 +22,8 @@
     "ask": [
       "Bash(bash zsh/install.sh)",
       "Bash(./zsh/install.sh)",
+      "Bash(home-manager switch:*)",
+      "Bash(nix flake update:*)",
       "Bash(git push:*)"
     ],
     "deny": [
