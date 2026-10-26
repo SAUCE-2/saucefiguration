@@ -837,7 +837,9 @@ if have cf; then
   log "Cloudflare CLI already installed"
 elif have npm; then
   log "Installing Cloudflare CLI"
-  run npm install --global cf || warn "npm could not install cf (needs Node 22.18+)"
+  # cf pulls in workerd, whose postinstall fetches its binary. npm 11 skips
+  # install scripts it has not been told to allow, leaving workerd broken.
+  run npm install --global --allow-scripts=workerd cf || warn "npm could not install cf (needs Node 22.18+)"
 else
   warn "no npm; Cloudflare CLI needs Node 22.18+ (npm install --global cf)"
 fi
