@@ -34,6 +34,10 @@ plugins=(
 # omz's gh plugin builds its completions by running gh, so it needs gh.
 (( $+commands[gh] )) && plugins+=(gh)
 
+# Docker isn't in install.sh: the engine comes from Docker Desktop, OrbStack
+# or the distro, so only load its completions and aliases where it exists.
+(( $+commands[docker] )) && plugins+=(docker docker-compose)
+
 # After each command, print any shorter alias you could have used instead.
 zstyle ':omz:plugins:alias-finder' autoload yes
 zstyle ':omz:plugins:alias-finder' cheaper yes
