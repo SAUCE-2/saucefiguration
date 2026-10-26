@@ -863,28 +863,28 @@ fi
 # https://github.com/bootdotdev/bootdev
 # ~/.local/go/bin goes first so the go.dev Go wins over an old distro one.
 export PATH="$HOME/.local/go/bin:$HOME/go/bin:$PATH"
+# Go even when bootdev is already there: bootdev runs `go` for its version
+# check and upgrades, and prompts on every `bootdev run` without it.
+if ! go_new_enough; then
+  if [ "$PM" = brew ]; then
+    log "Installing Go (needed for Boot.dev CLI)"
+    install_pkg go || warn "brew could not install go"
+  elif [ "$PM_WRITE" = 1 ] && ! have go; then
+    log "Installing Go (needed for Boot.dev CLI)"
+    install_pkg go || warn "$PM has no '$(pkg_name "$PM" go)'"
+  fi
+  # Distro Go too old, missing, or the package db is read-only.
+  if [ "$PM" != brew ] && ! go_new_enough; then
+    log "Installing Go 1.$go_min_minor+ from go.dev into ~/.local/go"
+    install_go_user || warn "could not install Go; install Go 1.$go_min_minor+ yourself for bootdev"
+  fi
+fi
 if have bootdev; then
   log "Boot.dev CLI already installed"
-else
-  if ! go_new_enough; then
-    if [ "$PM" = brew ]; then
-      log "Installing Go (needed for Boot.dev CLI)"
-      install_pkg go || warn "brew could not install go"
-    elif [ "$PM_WRITE" = 1 ] && ! have go; then
-      log "Installing Go (needed for Boot.dev CLI)"
-      install_pkg go || warn "$PM has no '$(pkg_name "$PM" go)'"
-    fi
-    # Distro Go too old, missing, or the package db is read-only.
-    if [ "$PM" != brew ] && ! go_new_enough; then
-      log "Installing Go 1.$go_min_minor+ from go.dev into ~/.local/go"
-      install_go_user || warn "could not install Go; install Go 1.$go_min_minor+ yourself for bootdev"
-    fi
-  fi
-  if go_new_enough || [ "${DRY_RUN:-0}" = 1 ]; then
-    log "Installing Boot.dev CLI"
-    run go install github.com/bootdotdev/bootdev@latest ||
-      warn "go install bootdev failed"
-  fi
+elif go_new_enough || [ "${DRY_RUN:-0}" = 1 ]; then
+  log "Installing Boot.dev CLI"
+  run go install github.com/bootdotdev/bootdev@latest ||
+    warn "go install bootdev failed"
 fi
 
 # Tailscale. Official Linux installer picks the right package repo; Homebrew
