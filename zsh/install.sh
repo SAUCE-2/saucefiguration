@@ -879,11 +879,13 @@ if ! go_new_enough; then
     install_go_user || warn "could not install Go; install Go 1.$go_min_minor+ yourself for bootdev"
   fi
 fi
-if have bootdev; then
-  log "Boot.dev CLI already installed"
+# Pinned; bump bootdev_version to upgrade.
+bootdev_version=v1.32.6
+if have bootdev && [ "$(bootdev --version 2>/dev/null)" = "bootdev version $bootdev_version" ]; then
+  log "Boot.dev CLI $bootdev_version already installed"
 elif go_new_enough || [ "${DRY_RUN:-0}" = 1 ]; then
-  log "Installing Boot.dev CLI"
-  run go install github.com/bootdotdev/bootdev@latest ||
+  log "Installing Boot.dev CLI $bootdev_version"
+  run go install "github.com/bootdotdev/bootdev@$bootdev_version" ||
     warn "go install bootdev failed"
 fi
 
