@@ -194,6 +194,50 @@ PM=pacman install_pkg fzf-tab && {
   exit 1
 }
 
+for want in brew:openjdk@25 apt-get:openjdk-25-jdk dnf:java-25-openjdk-devel \
+  zypper:java-25-openjdk-devel pacman:jdk25-openjdk apk:openjdk25-jdk; do
+  [ "$(pkg_name "${want%%:*}" jdk)" = "${want#*:}" ] || {
+    echo "pkg_name ${want%%:*} jdk" >&2
+    exit 1
+  }
+done
+
+# find_jdk: a JDK needs java and javac. Fake one up under each root.
+fake_jdk() {
+  mkdir -p "$1/bin"
+  printf '#!/bin/sh\n' >"$1/bin/java"
+  chmod +x "$1/bin/java"
+  [ "${2:-}" = jre ] && return
+  printf '#!/bin/sh\n' >"$1/bin/javac"
+  chmod +x "$1/bin/javac"
+}
+jdk_env() { HOMEBREW_PREFIX="$work/jbrew" HOME="$work/jhome" SAUCE_JVM_DIRS="$work/jvm $work/jvm64" find_jdk; }
+jdk_env >/dev/null && {
+  echo 'find_jdk should fail with no JDK' >&2
+  exit 1
+}
+fake_jdk "$work/jvm/java-25-openjdk-amd64" jre
+fake_jdk "$work/jvm/java-21-openjdk-amd64"
+jdk_env >/dev/null && {
+  echo 'find_jdk should skip a JRE and other versions' >&2
+  exit 1
+}
+fake_jdk "$work/jhome/.local/jdk-25"
+[ "$(jdk_env)" = "$work/jhome/.local/jdk-25" ] || {
+  echo "find_jdk ~/.local: $(jdk_env)" >&2
+  exit 1
+}
+fake_jdk "$work/jvm64/java-25-openjdk"
+[ "$(jdk_env)" = "$work/jvm64/java-25-openjdk" ] || {
+  echo "find_jdk should prefer the distro JDK: $(jdk_env)" >&2
+  exit 1
+}
+fake_jdk "$work/jbrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home"
+[ "$(jdk_env)" = "$work/jbrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home" ] || {
+  echo "find_jdk should prefer Homebrew's keg: $(jdk_env)" >&2
+  exit 1
+}
+
 mkdir -p "$work/yqpy" "$work/yqgo"
 printf '#!/bin/sh\necho yq 3.4.3\n' >"$work/yqpy/yq"
 printf '#!/bin/sh\necho "yq (https://github.com/mikefarah/yq/) version v4.45.1"\n' >"$work/yqgo/yq"

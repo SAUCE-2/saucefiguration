@@ -6,7 +6,7 @@ offers to pull and re-run it when the clone gets new commits.
 
 - `zsh/`: per-OS `.zshrc` (`darwin/`, `linux/`) and the scripts.
   - `install.sh` installs the tools the zshrc expects (packages, Oh My Zsh,
-    nvm/Node/pnpm, Oh My Posh, Go, tmux plugins, ...), then copies the
+    nvm/Node/pnpm, Oh My Posh, Go, OpenJDK, tmux plugins, ...), then copies the
     configs below into `$HOME` and records the clone's path and HEAD in
     `~/.local/state/saucefiguration/`.
   - `check-update.sh` runs from `.zshrc` at shell start. When the clone has

@@ -16,6 +16,13 @@ export PATH="$HOME/.local/bin:$HOME/.local/go/bin:$HOME/go/bin:$PATH"
 # Prevent duplicate PATH and completion entries.
 typeset -U path fpath
 
+# OpenJDK 25 (install.sh). Homebrew's openjdk@25 is keg-only: not on PATH and
+# not seen by /usr/libexec/java_home, so set JAVA_HOME and put its bin first.
+if [[ -n $HOMEBREW_PREFIX && -x $HOMEBREW_PREFIX/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home/bin/javac ]]; then
+  export JAVA_HOME="$HOMEBREW_PREFIX/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home"
+  path=("$JAVA_HOME/bin" $path)
+fi
+
 plugins=(
   aliases
   alias-finder
