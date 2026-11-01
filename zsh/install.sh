@@ -51,6 +51,10 @@ wsl_packages="
   wslu:wslview
 "
 
+# OpenJDK major version. The .zshrc files look for this one too (java-25,
+# openjdk@25, jdk-25); bump them together.
+jdk_major=25
+
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33mskip:\033[0m %s\n' "$*" >&2; }
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -107,6 +111,12 @@ pkg_name() {
     apt-get:go) echo golang-go ;;
     dnf:go) echo golang ;;
     apk:git-delta) echo delta ;;
+    # The JDK, not just the runtime: javac too.
+    brew:jdk) echo "openjdk@$jdk_major" ;;
+    apt-get:jdk) echo "openjdk-$jdk_major-jdk" ;;
+    dnf:jdk | zypper:jdk) echo "java-$jdk_major-openjdk-devel" ;;
+    pacman:jdk) echo "jdk$jdk_major-openjdk" ;;
+    apk:jdk) echo "openjdk$jdk_major-jdk" ;;
     # yq means mikefarah's Go yq. Debian/Ubuntu's yq is kislyuk's Python
     # wrapper around jq (other syntax), so apt gets none and install_user
     # fetches the release binary. Arch and Alpine ship the Go one renamed.
@@ -434,6 +444,64 @@ install_go_user() {
   rm -rf "$tmp"
 }
 
+# Prints the JAVA_HOME of an installed OpenJDK $jdk_major: Homebrew's keg, a
+# distro package under /usr/lib/jvm (Debian adds an arch suffix, openSUSE uses
+# lib64), or install_jdk_user's copy. A bare JRE (no javac) does not count.
+# The .zshrc files search the same places. SAUCE_JVM_DIRS is for tests.
+find_jdk() {
+  local root dir
+  set -- "${HOMEBREW_PREFIX:-}/opt/openjdk@$jdk_major/libexec/openjdk.jdk/Contents/Home"
+  for root in ${SAUCE_JVM_DIRS:-/usr/lib/jvm /usr/lib64/jvm}; do
+    set -- "$@" "$root/java-$jdk_major-openjdk"*
+  done
+  for dir in "$@" "$HOME/.local/jdk-$jdk_major"; do
+    if [ -x "$dir/bin/java" ] && [ -x "$dir/bin/javac" ]; then
+      echo "$dir"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Eclipse Temurin (Adoptium's OpenJDK build) into ~/.local/jdk-$jdk_major, for
+# a distro without the package or with a read-only root. Linux only; Homebrew
+# has openjdk@N. Alpine is musl and needs its own build.
+install_jdk_user() {
+  local arch os=linux tmp found dest="$HOME/.local/jdk-$jdk_major"
+  case $(uname -m) in
+    x86_64 | amd64) arch=x64 ;;
+    aarch64 | arm64) arch=aarch64 ;;
+    *) return 1 ;;
+  esac
+  [ "${PM:-}" = apk ] && os=alpine-linux
+  [ "${DRY_RUN:-0}" = 1 ] && {
+    printf '   would install Temurin %s (%s-%s) into ~/.local/jdk-%s\n' "$jdk_major" "$os" "$arch" "$jdk_major"
+    return 0
+  }
+  tmp=$(mktemp -d) || return 1
+  if ! curl -fsSL "https://api.adoptium.net/v3/binary/latest/$jdk_major/ga/$os/$arch/jdk/hotspot/normal/eclipse" |
+    tar -xz -C "$tmp"; then
+    rm -rf "$tmp"
+    return 1
+  fi
+  # The tarball holds a single jdk-<version> directory.
+  found=$(find "$tmp" -mindepth 1 -maxdepth 1 -type d)
+  case "$found" in
+    '' | *$'\n'*)
+      rm -rf "$tmp"
+      return 1
+      ;;
+  esac
+  if [ ! -x "$found/bin/javac" ]; then
+    rm -rf "$tmp"
+    return 1
+  fi
+  mkdir -p "$HOME/.local"
+  rm -rf "$dest"
+  mv "$found" "$dest"
+  rm -rf "$tmp"
+}
+
 # Copy $1 onto $2. Identical dest is a no-op. Anything else already there
 # is kept as $2.bak.<time>, then overwritten after a warning. Local edits,
 # such as git config --global writes, would be lost otherwise. $3 is an
@@ -710,6 +778,12 @@ if [ "$PM" = brew ] && ! have brew; then
   done
 fi
 
+# find_jdk and find_plugin look under $HOMEBREW_PREFIX, which only brew
+# shellenv sets.
+if [ "$PM" = brew ] && [ -z "${HOMEBREW_PREFIX:-}" ] && have brew; then
+  HOMEBREW_PREFIX=$(brew --prefix)
+fi
+
 if [ "$PM" = apt-get ] && [ "$PM_WRITE" = 1 ]; then
   log "Refreshing apt package lists"
   as_root apt-get update || fail "apt-get update" "installing from the cached package lists"
@@ -887,6 +961,22 @@ elif go_new_enough || [ "${DRY_RUN:-0}" = 1 ]; then
     warn "go install bootdev failed"
 fi
 
+# OpenJDK. Homebrew's openjdk@N is keg-only and a distro JDK need not be the
+# `java` on PATH, so the .zshrc sets JAVA_HOME to it and puts its bin first.
+if find_jdk >/dev/null; then
+  log "OpenJDK $jdk_major already installed"
+else
+  if [ "$PM_WRITE" = 1 ]; then
+    log "Installing OpenJDK $jdk_major"
+    install_pkg jdk || warn "$PM has no '$(pkg_name "$PM" jdk)'"
+  fi
+  # No distro package, or the package db is read-only.
+  if [ "$PM" != brew ] && ! find_jdk >/dev/null; then
+    log "Installing Temurin $jdk_major from Adoptium into ~/.local/jdk-$jdk_major"
+    install_jdk_user || warn "could not install OpenJDK $jdk_major; install it yourself if you want it"
+  fi
+fi
+
 # Tailscale. Official Linux installer picks the right package repo; Homebrew
 # prefers the Mac app cask (CLI included) and falls back to the formula.
 # Does not run `tailscale up` — auth stays interactive.
@@ -954,6 +1044,13 @@ if [ -d "$HOME/.oh-my-zsh" ]; then
   printf '  ok       %-22s %s\n' oh-my-zsh "$HOME/.oh-my-zsh"
 else
   printf '  missing  %s\n' oh-my-zsh
+  missing=$((missing + 1))
+fi
+
+if jdk_home=$(find_jdk); then
+  printf '  ok       %-22s %s\n' "openjdk $jdk_major" "$jdk_home"
+else
+  printf '  missing  %s\n' "openjdk $jdk_major"
   missing=$((missing + 1))
 fi
 

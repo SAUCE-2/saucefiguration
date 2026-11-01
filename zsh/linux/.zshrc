@@ -9,6 +9,20 @@ export PATH="$HOME/.local/bin:$HOME/.local/go/bin:$HOME/go/bin:$PATH"
 # Prevent duplicate PATH and completion entries.
 typeset -U path fpath
 
+# OpenJDK 25 (install.sh): a distro package under /usr/lib/jvm (Debian adds an
+# arch suffix, openSUSE uses lib64), else Temurin in ~/.local/jdk-25. Neither
+# need be the `java` on PATH, so set JAVA_HOME and put its bin first.
+() {
+  local jdk
+  for jdk in /usr/lib/jvm/java-25-openjdk*(N-/) /usr/lib64/jvm/java-25-openjdk*(N-/) "$HOME/.local/jdk-25"; do
+    if [[ -x $jdk/bin/java && -x $jdk/bin/javac ]]; then
+      export JAVA_HOME=$jdk
+      path=("$JAVA_HOME/bin" $path)
+      return
+    fi
+  done
+}
+
 plugins=(
   aliases
   alias-finder
