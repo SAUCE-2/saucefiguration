@@ -16,6 +16,18 @@
       "alignment": "left",
       "segments": [
         {
+          "type": "os",
+          "style": "plain",
+          "foreground": "p:fg",
+          "template": "{{ .Icon }} "
+        },
+        {
+          "type": "session",
+          "style": "plain",
+          "foreground": "p:purple",
+          "template": "{{ .UserName }}@{{ .HostName }} "
+        },
+        {
           "type": "status",
           "style": "plain",
           "foreground": "p:green",
@@ -51,6 +63,8 @@
     "red": "#f7768e",
     "cyan": "#7dcfff",
     "blue": "#7aa2f7",
-    "yellow": "#e0af68"
+    "yellow": "#e0af68",
+    "purple": "#bb9af7",
+    "fg": "#c0caf5"
   }
 }
