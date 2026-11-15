@@ -610,6 +610,11 @@ install_dotfiles() {
       *) copy_file "$src" "$HOME/.ssh/$name" ;;
     esac
   done
+
+  # Global instructions for Claude, which T3 Code's Claude provider reads too,
+  # and the script that keeps the tstack skills current (see install_tstack).
+  copy_file "$root/agents/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
+  copy_file "$root/agents/update-tstack.sh" "$HOME/.local/bin/update-tstack" 755
 }
 
 # Stamp this clone so a later shell can offer to update (see check-update.sh).
@@ -727,6 +732,14 @@ install_tmux_plugins() {
   TMUX='' TMUX_TMPDIR="$sock" tmux kill-server >/dev/null 2>&1 || true
   rm -rf "$sock"
   [ "$rc" = 0 ] || fail "tmux plugin install"
+}
+
+# tstack's agent skills (council, full-send, ...) into ~/.claude/skills and
+# ~/.agents/skills. Runs after install_dotfiles, which puts update-tstack in
+# ~/.local/bin. Re-run update-tstack by hand to pull newer skills.
+install_tstack() {
+  log "Installing tstack agent skills"
+  run "$HOME/.local/bin/update-tstack" || fail "tstack skills"
 }
 
 # install.test.sh sources this file for the functions above and nothing else.
@@ -1060,6 +1073,7 @@ fi
 
 install_dotfiles
 install_tmux_plugins
+install_tstack
 # Stamp even when a step failed: the configs are in, and an unstamped rev
 # would have every new shell offer the same update again.
 record_install_rev

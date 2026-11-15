@@ -17,6 +17,9 @@ ohmyposh:
 direnv:
   - changed-files:
       - any-glob-to-any-file: direnv/**
+agents:
+  - changed-files:
+      - any-glob-to-any-file: agents/**
 github:
   - changed-files:
       - any-glob-to-any-file: .github/**

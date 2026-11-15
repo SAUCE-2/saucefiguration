@@ -19,6 +19,13 @@ offers to pull and re-run it when the clone gets new commits.
 - `ohmyposh/` -> `~/.config/ohmyposh/`: prompt theme.
 - `direnv/` -> `~/.config/direnv/`.
 - `tmux/.tmux.conf` -> `~/.tmux.conf`.
+- `agents/`: the user's global agent setup, not this repo's.
+  `CLAUDE.md` -> `~/.claude/CLAUDE.md` (global instructions, read by Claude
+  and T3 Code's Claude provider). `update-tstack.sh` ->
+  `~/.local/bin/update-tstack`, which `install.sh` then runs: it clones or
+  pulls github.com/t3dotgg/tstack into `~/.t3/tools/tstack` and copies its
+  skills into `~/.claude/skills` and `~/.agents/skills`, leaving other skills
+  there alone.
 - `.github/`: CI, PR title check and labels, Dependabot, stale `claude/*`
   branch pruning. `settings.sh` applies the repo settings and `main` ruleset
   (squash only, auto-delete branches, CI required); the user runs it by hand.
@@ -46,7 +53,7 @@ up as `<file>.bak.<time>` before it is replaced.
 ```bash
 bash zsh/install.test.sh
 bash zsh/check-update.test.sh
-shellcheck zsh/*.sh .github/*.sh
+shellcheck zsh/*.sh .github/*.sh agents/*.sh
 zsh -n zsh/linux/.zshrc zsh/darwin/.zshrc
 ```
 

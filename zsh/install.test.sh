@@ -462,7 +462,10 @@ fi
 # Full set of repo configs into a fake $HOME.
 tree="$work/repo"
 home="$work/home"
-mkdir -p "$tree/zsh/linux" "$tree/zsh/darwin" "$tree/tmux" "$tree/git" "$tree/ohmyposh" "$tree/direnv" "$tree/ssh"
+mkdir -p "$tree/zsh/linux" "$tree/zsh/darwin" "$tree/tmux" "$tree/git" "$tree/ohmyposh" "$tree/direnv" "$tree/ssh" "$tree/agents"
+printf 'claude\n' >"$tree/agents/CLAUDE.md"
+# Fails like an offline clone, for the failed-run test below.
+printf '%s\n' '#!/bin/sh' 'echo "tstack: offline" >&2' 'exit 1' >"$tree/agents/update-tstack.sh"
 printf 'zshrc\n' >"$tree/zsh/linux/.zshrc"
 printf 'zshrc\n' >"$tree/zsh/darwin/.zshrc"
 printf 'tmux\n' >"$tree/tmux/.tmux.conf"
@@ -523,6 +526,50 @@ printf '%s\n' "$err" | grep -q "replacing $home/.zshrc" || {
 }
 [ "$(file_mode "$home/.ssh/config")" = 600 ] || {
   echo "ssh config mode: $(file_mode "$home/.ssh/config")" >&2
+  exit 1
+}
+[ "$(cat "$home/.claude/CLAUDE.md")" = claude ] || {
+  echo 'install_dotfiles missed agents/CLAUDE.md' >&2
+  exit 1
+}
+[ "$(file_mode "$home/.local/bin/update-tstack")" = 755 ] || {
+  echo "update-tstack mode: $(file_mode "$home/.local/bin/update-tstack" 2>/dev/null)" >&2
+  exit 1
+}
+
+# update-tstack: copies only tstack's skills into both skill folders, keeps
+# other skills, and replaces an old copy of a tstack skill. A local repo stands
+# in for GitHub.
+ts="$work/tstack-src"
+mkdir -p "$ts/skills/council" "$ts/skills/file-pr"
+printf 'new council\n' >"$ts/skills/council/SKILL.md"
+printf 'file-pr\n' >"$ts/skills/file-pr/SKILL.md"
+git -C "$ts" init -q
+git -C "$ts" add -A
+git -C "$ts" -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -qm init
+th="$work/tstackhome"
+mkdir -p "$th/.claude/skills/council" "$th/.claude/skills/improve"
+printf 'old council\n' >"$th/.claude/skills/council/SKILL.md"
+printf 'stale\n' >"$th/.claude/skills/council/stale.md"
+printf 'mine\n' >"$th/.claude/skills/improve/SKILL.md"
+out=$(HOME="$th" TSTACK_DIR="$th/tstack" TSTACK_URL="$ts" bash "$script_dir/../agents/update-tstack.sh" 2>&1) || {
+  printf 'update-tstack failed\n%s\n' "$out" >&2
+  exit 1
+}
+for dir in "$th/.claude/skills" "$th/.agents/skills"; do
+  [ "$(cat "$dir/council/SKILL.md" 2>/dev/null)" = 'new council' ] &&
+    [ -f "$dir/file-pr/SKILL.md" ] && [ ! -e "$dir/council/stale.md" ] || {
+    printf 'update-tstack did not refresh %s\n%s\n' "$dir" "$out" >&2
+    exit 1
+  }
+done
+[ "$(cat "$th/.claude/skills/improve/SKILL.md")" = mine ] || {
+  echo 'update-tstack touched a skill tstack does not ship' >&2
+  exit 1
+}
+# Second run pulls the existing clone instead of cloning again.
+HOME="$th" TSTACK_DIR="$th/tstack" TSTACK_URL="$ts" bash "$script_dir/../agents/update-tstack.sh" >/dev/null 2>&1 || {
+  echo 'update-tstack failed on an existing clone' >&2
   exit 1
 }
 
@@ -619,6 +666,14 @@ for src in "$real_root/ssh"/* "$real_root/ssh"/.[!.]*; do
     exit 1
   }
 done
+cmp -s "$real_root/agents/CLAUDE.md" "$real_home/.claude/CLAUDE.md" || {
+  echo 'install_dotfiles missed real agents/CLAUDE.md' >&2
+  exit 1
+}
+cmp -s "$real_root/agents/update-tstack.sh" "$real_home/.local/bin/update-tstack" || {
+  echo 'install_dotfiles missed real agents/update-tstack.sh' >&2
+  exit 1
+}
 
 # Whole run on a Linux box with no sudo rights and every installer script
 # failing. PATH holds only these stubs and basic tools, so nothing real runs.
@@ -659,7 +714,7 @@ out=$(env -i HOME="$fail_home" PATH="$stubs" SAUCE_ROOT="$tree" SAUCE_STATE_DIR=
   printf 'failed install did not stamp the rev\n%s\n' "$out" >&2
   exit 1
 }
-printf '%s\n' "$out" | grep -q 'apt-get update, Oh My Zsh install, nvm install, Oh My Posh install\. Configs are copied' || {
+printf '%s\n' "$out" | grep -q 'apt-get update, Oh My Zsh install, nvm install, Oh My Posh install, tstack skills\. Configs are copied' || {
   printf 'missing summary of failed steps\n%s\n' "$out" >&2
   exit 1
 }
