@@ -515,6 +515,10 @@ copy_file() {
 
   if [ -L "$dest" ] || [ -f "$dest" ]; then
     if cmp -s "$src" "$dest"; then
+      # Same bytes can still have the wrong mode (an update-tstack that lost +x).
+      if [ -n "$mode" ] && [ "${DRY_RUN:-0}" != 1 ]; then
+        chmod "$mode" "$dest"
+      fi
       return 0
     fi
     # A dangling symlink has nothing to keep.
@@ -610,6 +614,33 @@ install_dotfiles() {
       *) copy_file "$src" "$HOME/.ssh/$name" ;;
     esac
   done
+
+  # Global agent instructions, and the script that keeps the tstack skills
+  # current (see install_tstack). ~/.claude/CLAUDE.md is not replaced: other
+  # tools keep their own blocks in it, so it only gains a line importing ours.
+  # Claude reads it, and so does T3 Code's Claude provider.
+  copy_file "$root/agents/saucefiguration.md" "$HOME/.claude/saucefiguration.md"
+  add_line "$HOME/.claude/CLAUDE.md" '@~/.claude/saucefiguration.md'
+  copy_file "$root/agents/update-tstack.sh" "$HOME/.local/bin/update-tstack" 755
+}
+
+# Append the line $2 to $1 unless $1 already has it. Creates $1 if needed and
+# leaves everything else in it alone.
+add_line() {
+  local file=$1 line=$2
+  if [ -f "$file" ] && awk -v l="$line" '$0 == l { found = 1 } END { exit !found }' "$file"; then
+    return 0
+  fi
+  if [ "${DRY_RUN:-0}" = 1 ]; then
+    printf '   would add %s to %s\n' "$line" "$file"
+    return 0
+  fi
+  mkdir -p "$(dirname "$file")"
+  # A last line without a newline would run into ours.
+  if [ -s "$file" ] && [ -n "$(tail -c 1 "$file")" ]; then
+    printf '\n' >>"$file"
+  fi
+  printf '%s\n' "$line" >>"$file"
 }
 
 # Stamp this clone so a later shell can offer to update (see check-update.sh).
@@ -727,6 +758,14 @@ install_tmux_plugins() {
   TMUX='' TMUX_TMPDIR="$sock" tmux kill-server >/dev/null 2>&1 || true
   rm -rf "$sock"
   [ "$rc" = 0 ] || fail "tmux plugin install"
+}
+
+# tstack's agent skills (council, full-send, ...) into ~/.claude/skills and
+# ~/.agents/skills. Runs after install_dotfiles, which puts update-tstack in
+# ~/.local/bin. Re-run update-tstack by hand to pull newer skills.
+install_tstack() {
+  log "Installing tstack agent skills"
+  run "$HOME/.local/bin/update-tstack" || fail "tstack skills"
 }
 
 # install.test.sh sources this file for the functions above and nothing else.
@@ -1060,6 +1099,7 @@ fi
 
 install_dotfiles
 install_tmux_plugins
+install_tstack
 # Stamp even when a step failed: the configs are in, and an unstamped rev
 # would have every new shell offer the same update again.
 record_install_rev
