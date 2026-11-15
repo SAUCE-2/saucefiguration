@@ -20,8 +20,11 @@ offers to pull and re-run it when the clone gets new commits.
 - `direnv/` -> `~/.config/direnv/`.
 - `tmux/.tmux.conf` -> `~/.tmux.conf`.
 - `agents/`: the user's global agent setup, not this repo's.
-  `CLAUDE.md` -> `~/.claude/CLAUDE.md` (global instructions, read by Claude
-  and T3 Code's Claude provider). `update-tstack.sh` ->
+  `saucefiguration.md` -> `~/.claude/saucefiguration.md` (global
+  instructions). `~/.claude/CLAUDE.md` is never replaced, since other tools
+  keep blocks in it; it only gains an `@~/.claude/saucefiguration.md` import
+  line if missing. Claude and T3 Code's Claude provider read it.
+  `update-tstack.sh` ->
   `~/.local/bin/update-tstack`, which `install.sh` then runs: it clones or
   pulls github.com/t3dotgg/tstack into `~/.t3/tools/tstack` and copies its
   skills into `~/.claude/skills` and `~/.agents/skills`, leaving other skills

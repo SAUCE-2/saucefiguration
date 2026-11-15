@@ -463,7 +463,7 @@ fi
 tree="$work/repo"
 home="$work/home"
 mkdir -p "$tree/zsh/linux" "$tree/zsh/darwin" "$tree/tmux" "$tree/git" "$tree/ohmyposh" "$tree/direnv" "$tree/ssh" "$tree/agents"
-printf 'claude\n' >"$tree/agents/CLAUDE.md"
+printf 'agent rules\n' >"$tree/agents/saucefiguration.md"
 # Fails like an offline clone, for the failed-run test below.
 printf '%s\n' '#!/bin/sh' 'echo "tstack: offline" >&2' 'exit 1' >"$tree/agents/update-tstack.sh"
 printf 'zshrc\n' >"$tree/zsh/linux/.zshrc"
@@ -476,8 +476,10 @@ printf 'direnv\n' >"$tree/direnv/direnv.toml"
 printf 'sshconfig\n' >"$tree/ssh/config"
 printf 'keys\n' >"$tree/ssh/authorized_keys"
 printf 'signers\n' >"$tree/ssh/allowed_signers"
-mkdir -p "$home"
+mkdir -p "$home/.claude"
 printf 'old-zshrc\n' >"$home/.zshrc"
+# Another tool's block, with no newline at the end, must survive.
+printf '<!-- other:start -->\n@/elsewhere.md\n<!-- other:end -->' >"$home/.claude/CLAUDE.md"
 
 err=$(HOME="$home" SAUCE_ROOT="$tree" install_dotfiles 2>&1 >/dev/null) || true
 printf '%s\n' "$err" | grep -q "replacing $home/.zshrc" || {
@@ -528,12 +530,29 @@ printf '%s\n' "$err" | grep -q "replacing $home/.zshrc" || {
   echo "ssh config mode: $(file_mode "$home/.ssh/config")" >&2
   exit 1
 }
-[ "$(cat "$home/.claude/CLAUDE.md")" = claude ] || {
-  echo 'install_dotfiles missed agents/CLAUDE.md' >&2
+[ "$(cat "$home/.claude/saucefiguration.md")" = 'agent rules' ] || {
+  echo 'install_dotfiles missed agents/saucefiguration.md' >&2
+  exit 1
+}
+want_claude=$(printf '%s\n' '<!-- other:start -->' '@/elsewhere.md' '<!-- other:end -->' '@~/.claude/saucefiguration.md')
+[ "$(cat "$home/.claude/CLAUDE.md")" = "$want_claude" ] || {
+  printf 'CLAUDE.md import\n%s\n' "$(cat "$home/.claude/CLAUDE.md")" >&2
   exit 1
 }
 [ "$(file_mode "$home/.local/bin/update-tstack")" = 755 ] || {
   echo "update-tstack mode: $(file_mode "$home/.local/bin/update-tstack" 2>/dev/null)" >&2
+  exit 1
+}
+# Re-run: the import is not added twice, and an identical update-tstack that
+# lost +x gets it back.
+chmod 644 "$home/.local/bin/update-tstack"
+HOME="$home" SAUCE_ROOT="$tree" install_dotfiles >/dev/null 2>&1 || true
+[ "$(cat "$home/.claude/CLAUDE.md")" = "$want_claude" ] || {
+  printf 'CLAUDE.md import added twice\n%s\n' "$(cat "$home/.claude/CLAUDE.md")" >&2
+  exit 1
+}
+[ "$(file_mode "$home/.local/bin/update-tstack")" = 755 ] || {
+  echo "identical update-tstack kept mode $(file_mode "$home/.local/bin/update-tstack")" >&2
   exit 1
 }
 
@@ -666,8 +685,12 @@ for src in "$real_root/ssh"/* "$real_root/ssh"/.[!.]*; do
     exit 1
   }
 done
-cmp -s "$real_root/agents/CLAUDE.md" "$real_home/.claude/CLAUDE.md" || {
-  echo 'install_dotfiles missed real agents/CLAUDE.md' >&2
+cmp -s "$real_root/agents/saucefiguration.md" "$real_home/.claude/saucefiguration.md" || {
+  echo 'install_dotfiles missed real agents/saucefiguration.md' >&2
+  exit 1
+}
+[ "$(cat "$real_home/.claude/CLAUDE.md")" = '@~/.claude/saucefiguration.md' ] || {
+  echo 'install_dotfiles did not create CLAUDE.md with the import' >&2
   exit 1
 }
 cmp -s "$real_root/agents/update-tstack.sh" "$real_home/.local/bin/update-tstack" || {
