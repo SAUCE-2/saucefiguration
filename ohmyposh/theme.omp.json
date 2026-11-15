@@ -41,7 +41,7 @@
           "type": "path",
           "style": "plain",
           "foreground": "p:cyan",
-          "template": " {{ .Path }}",
+          "template": "{{ .Path }}",
           "options": {
             "style": "folder"
           }
