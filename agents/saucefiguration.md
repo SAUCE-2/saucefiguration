@@ -13,3 +13,10 @@
 - **sol-loop**: GPT Sol runs through the Cursor provider in T3 (Codex is disabled).
 - In NiceNovember, changes to the judge's scoring, prompt or thresholds get a **council** review before the PR is filed.
 - Before closing an old or stale PR, run **modernize** on it and give me its verdict instead of closing silently.
+
+# Machines and Tailscale
+
+- Tailnet devices: `macbook` (macOS), `steampc` (SteamOS), `desktop` (Windows), `desktop-wsl` (WSL in `desktop`), `iphone`.
+- `ssh steampc` goes over Tailscale SSH and logs in as `deck` (from `ssh/config`). There's no `s` user on it.
+- The tailnet policy's SSH rule is `"action": "accept"` (`autogroup:member` → `autogroup:self`), so connecting never asks for a Google login.
+- On the Mac, the `tailscale` CLI is `/Applications/Tailscale.app/Contents/MacOS/Tailscale` when it isn't on `PATH`.
