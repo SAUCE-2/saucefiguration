@@ -1,3 +1,6 @@
+Host steampc
+  User deck
+
 Host *
   AddKeysToAgent yes
   IdentitiesOnly yes
