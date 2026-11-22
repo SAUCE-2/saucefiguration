@@ -624,23 +624,25 @@ install_dotfiles() {
   copy_file "$root/agents/AGENTS.md" "$HOME/.claude/AGENTS.md"
   add_line "$HOME/.claude/CLAUDE.md" '@~/.claude/AGENTS.md'
   # Before AGENTS.md, the same rules were ~/.claude/saucefiguration.md.
-  remove_line "$HOME/.claude/CLAUDE.md" '@~/.claude/saucefiguration.md'
-  remove_file "$HOME/.claude/saucefiguration.md"
+  remove_line "$HOME/.claude/CLAUDE.md" '@~/.claude/saucefiguration.md' &&
+    remove_file "$HOME/.claude/saucefiguration.md"
   # The script that keeps the tstack skills current (see install_tstack).
   copy_file "$root/agents/update-tstack.sh" "$HOME/.local/bin/update-tstack" 755
 }
 
 # Drop every line of $1 that is exactly $2, leaving the rest alone.
 remove_line() {
-  local file=$1 line=$2 tmp
+  local file=$1 line=$2 tmp rc=0
   [ -f "$file" ] && awk -v l="$line" '$0 == l { found = 1 } END { exit !found }' "$file" || return 0
   if [ "${DRY_RUN:-0}" = 1 ]; then
     printf '   would remove %s from %s\n' "$line" "$file"
     return 0
   fi
   tmp=$(mktemp "${TMPDIR:-/tmp}/remove_line.XXXXXX") || return 1
-  awk -v l="$line" '$0 != l' "$file" >"$tmp" && cat "$tmp" >"$file"
+  # cat, not mv, keeps the file's own mode and any symlink to it.
+  awk -v l="$line" '$0 != l' "$file" >"$tmp" && cat "$tmp" >"$file" || rc=$?
   rm -f "$tmp"
+  return "$rc"
 }
 
 # Delete a file an older install put in place, if it is still there.
