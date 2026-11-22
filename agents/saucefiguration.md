@@ -31,7 +31,9 @@
 - When a project needs a rules file, write `AGENTS.md` and make `CLAUDE.md` the single line `@AGENTS.md`, so every agent reads the same rules.
 - Include only what an agent needs at the start of every session: style rules with a short good/bad example, how to run one test and the full suite, where the database schema lives, a high-level directory overview, and project scripts the agent should use.
 - Leave out what the README already says (link to it instead), what the model already knows, secrets, and repeated rules. A stale directory overview is worse than none, so keep it brief.
-- When I correct a pattern you wrote, add it to the style section of that project's `AGENTS.md` with a one-line reason and an example, and tell me you did.
+- When I correct or undo something you wrote, suggest an `AGENTS.md` edit that would prevent it (a one-line reason and an example) and ask before making it.
+- A stale rule is worse than none. When a change renames or moves important directories, changes test, lint or build commands, adds or removes a major dependency, or starts or retires a convention, update `AGENTS.md` in the same change.
+- When you notice a rule the model no longer needs, suggest removing it.
 
 # Machines and Tailscale
 
