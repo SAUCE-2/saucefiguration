@@ -1,5 +1,6 @@
-Host steampc
-  User deck
+# Per-machine hosts (names, users, addresses) live in ~/.ssh/config.d/,
+# which is never committed: this repo is public.
+Include config.d/*
 
 Host *
   AddKeysToAgent yes
