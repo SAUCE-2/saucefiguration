@@ -615,13 +615,42 @@ install_dotfiles() {
     esac
   done
 
-  # Global agent instructions, and the script that keeps the tstack skills
-  # current (see install_tstack). ~/.claude/CLAUDE.md is not replaced: other
-  # tools keep their own blocks in it, so it only gains a line importing ours.
-  # Claude reads it, and so does T3 Code's Claude provider.
-  copy_file "$root/agents/saucefiguration.md" "$HOME/.claude/saucefiguration.md"
-  add_line "$HOME/.claude/CLAUDE.md" '@~/.claude/saucefiguration.md'
+  # One global AGENTS.md, copied to where each agent looks for its global
+  # rules: Codex and OpenCode read theirs as is. Claude only reads CLAUDE.md,
+  # which is not replaced (other tools keep their own blocks in it), so it
+  # gains a line importing ours. T3 Code's Claude provider reads it too.
+  copy_file "$root/agents/AGENTS.md" "$HOME/.codex/AGENTS.md"
+  copy_file "$root/agents/AGENTS.md" "$HOME/.config/opencode/AGENTS.md"
+  copy_file "$root/agents/AGENTS.md" "$HOME/.claude/AGENTS.md"
+  add_line "$HOME/.claude/CLAUDE.md" '@~/.claude/AGENTS.md'
+  # Before AGENTS.md, the same rules were ~/.claude/saucefiguration.md.
+  remove_line "$HOME/.claude/CLAUDE.md" '@~/.claude/saucefiguration.md'
+  remove_file "$HOME/.claude/saucefiguration.md"
+  # The script that keeps the tstack skills current (see install_tstack).
   copy_file "$root/agents/update-tstack.sh" "$HOME/.local/bin/update-tstack" 755
+}
+
+# Drop every line of $1 that is exactly $2, leaving the rest alone.
+remove_line() {
+  local file=$1 line=$2 tmp
+  [ -f "$file" ] && awk -v l="$line" '$0 == l { found = 1 } END { exit !found }' "$file" || return 0
+  if [ "${DRY_RUN:-0}" = 1 ]; then
+    printf '   would remove %s from %s\n' "$line" "$file"
+    return 0
+  fi
+  tmp=$(mktemp "${TMPDIR:-/tmp}/remove_line.XXXXXX") || return 1
+  awk -v l="$line" '$0 != l' "$file" >"$tmp" && cat "$tmp" >"$file"
+  rm -f "$tmp"
+}
+
+# Delete a file an older install put in place, if it is still there.
+remove_file() {
+  [ -f "$1" ] || return 0
+  if [ "${DRY_RUN:-0}" = 1 ]; then
+    printf '   would remove %s\n' "$1"
+    return 0
+  fi
+  rm -f "$1"
 }
 
 # Append the line $2 to $1 unless $1 already has it. Creates $1 if needed and

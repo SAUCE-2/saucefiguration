@@ -1,3 +1,5 @@
+<!-- Global rules for every agent and project. Edit agents/AGENTS.md in SAUCE-2/saucefiguration; install.sh copies it into place. -->
+
 # Shell command hygiene
 
 - Don't let exploratory/probing commands end with a non-zero exit code. A non-zero exit makes the app show the whole output in red as "Failed" even when everything worked. When a command checks for things that may not exist (`which`, `ls`, `cat`, `test`, `grep`), add `2>/dev/null` to the individual probes and end the command with `; true` (or `|| true`). Use a real non-zero exit only when something actually went wrong.
