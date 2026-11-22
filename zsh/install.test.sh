@@ -463,7 +463,7 @@ fi
 tree="$work/repo"
 home="$work/home"
 mkdir -p "$tree/zsh/linux" "$tree/zsh/darwin" "$tree/tmux" "$tree/git" "$tree/ohmyposh" "$tree/direnv" "$tree/ssh" "$tree/agents"
-printf 'agent rules\n' >"$tree/agents/saucefiguration.md"
+printf 'agent rules\n' >"$tree/agents/AGENTS.md"
 # Fails like an offline clone, for the failed-run test below.
 printf '%s\n' '#!/bin/sh' 'echo "tstack: offline" >&2' 'exit 1' >"$tree/agents/update-tstack.sh"
 printf 'zshrc\n' >"$tree/zsh/linux/.zshrc"
@@ -478,8 +478,10 @@ printf 'keys\n' >"$tree/ssh/authorized_keys"
 printf 'signers\n' >"$tree/ssh/allowed_signers"
 mkdir -p "$home/.claude"
 printf 'old-zshrc\n' >"$home/.zshrc"
-# Another tool's block, with no newline at the end, must survive.
-printf '<!-- other:start -->\n@/elsewhere.md\n<!-- other:end -->' >"$home/.claude/CLAUDE.md"
+# Another tool's block, with no newline at the end, must survive. The old
+# saucefiguration.md import and file must go.
+printf '@~/.claude/saucefiguration.md\n<!-- other:start -->\n@/elsewhere.md\n<!-- other:end -->' >"$home/.claude/CLAUDE.md"
+printf 'old agent rules\n' >"$home/.claude/saucefiguration.md"
 
 err=$(HOME="$home" SAUCE_ROOT="$tree" install_dotfiles 2>&1 >/dev/null) || true
 printf '%s\n' "$err" | grep -q "replacing $home/.zshrc" || {
@@ -530,11 +532,17 @@ printf '%s\n' "$err" | grep -q "replacing $home/.zshrc" || {
   echo "ssh config mode: $(file_mode "$home/.ssh/config")" >&2
   exit 1
 }
-[ "$(cat "$home/.claude/saucefiguration.md")" = 'agent rules' ] || {
-  echo 'install_dotfiles missed agents/saucefiguration.md' >&2
+for dest in .codex/AGENTS.md .config/opencode/AGENTS.md .claude/AGENTS.md; do
+  [ "$(cat "$home/$dest" 2>/dev/null)" = 'agent rules' ] || {
+    echo "install_dotfiles missed agents/AGENTS.md -> ~/$dest" >&2
+    exit 1
+  }
+done
+[ ! -e "$home/.claude/saucefiguration.md" ] || {
+  echo 'install_dotfiles kept the old ~/.claude/saucefiguration.md' >&2
   exit 1
 }
-want_claude=$(printf '%s\n' '<!-- other:start -->' '@/elsewhere.md' '<!-- other:end -->' '@~/.claude/saucefiguration.md')
+want_claude=$(printf '%s\n' '<!-- other:start -->' '@/elsewhere.md' '<!-- other:end -->' '@~/.claude/AGENTS.md')
 [ "$(cat "$home/.claude/CLAUDE.md")" = "$want_claude" ] || {
   printf 'CLAUDE.md import\n%s\n' "$(cat "$home/.claude/CLAUDE.md")" >&2
   exit 1
@@ -685,11 +693,13 @@ for src in "$real_root/ssh"/* "$real_root/ssh"/.[!.]*; do
     exit 1
   }
 done
-cmp -s "$real_root/agents/saucefiguration.md" "$real_home/.claude/saucefiguration.md" || {
-  echo 'install_dotfiles missed real agents/saucefiguration.md' >&2
-  exit 1
-}
-[ "$(cat "$real_home/.claude/CLAUDE.md")" = '@~/.claude/saucefiguration.md' ] || {
+for dest in .codex/AGENTS.md .config/opencode/AGENTS.md .claude/AGENTS.md; do
+  cmp -s "$real_root/agents/AGENTS.md" "$real_home/$dest" || {
+    echo "install_dotfiles missed real agents/AGENTS.md -> ~/$dest" >&2
+    exit 1
+  }
+done
+[ "$(cat "$real_home/.claude/CLAUDE.md")" = '@~/.claude/AGENTS.md' ] || {
   echo 'install_dotfiles did not create CLAUDE.md with the import' >&2
   exit 1
 }
