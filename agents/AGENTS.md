@@ -24,7 +24,7 @@ Reference only. Never create, edit, move or delete anything there, except in `~/
 
 # Git
 
-- Never commit straight to `main`, including in private repos like da2 and da3. Branch and open a PR.
+- Never commit straight to `main`, including in private repos. Branch and open a PR.
 - Don't stage or commit unless I ask, or a mode like **full stop** calls for it.
 - Before pushing, rebase onto the latest `main` unless I say otherwise, and squash wip or fixup commits into logical ones.
 - Commit messages are one short sentence in conventional-commit form (`feat(scope): ...`), unless the repo sets its own style.
@@ -54,11 +54,5 @@ Reference only. Never create, edit, move or delete anything there, except in `~/
 - A code change in one of my repos (SAUCE-2/*) with no mode named means **full stop**: prove it, review it, file the PR, babysit it, and leave it ready for me to merge. Merge only when I say **full send**.
 - **council:** Claude Opus (latest, via Claude), GPT Sol (latest, via Cursor) and Gemini (latest flagship, via Cursor; currently `gemini-4-hydrogen`), all at high reasoning effort.
 - **sol-loop:** GPT Sol runs through the Cursor provider (Codex is disabled).
-- In NiceNovember, changes to the judge's scoring, prompt or thresholds get a **council** review before the PR is filed.
 - Before closing an old or stale PR, run **modernize** on it and give me its verdict.
 
-# Machines
-
-- Tailnet: `macbook` (macOS), `steampc` (SteamOS), `desktop` (Windows), `desktop-wsl` (WSL in `desktop`), `iphone`.
-- `ssh steampc` uses Tailscale SSH and logs in as `deck`; there is no `s` user. The tailnet SSH rule is `accept`, so it never asks for a Google login.
-- On the Mac, the `tailscale` CLI is `/Applications/Tailscale.app/Contents/MacOS/Tailscale` when it isn't on `PATH`.
