@@ -14,6 +14,25 @@
 - In NiceNovember, changes to the judge's scoring, prompt or thresholds get a **council** review before the PR is filed.
 - Before closing an old or stale PR, run **modernize** on it and give me its verdict instead of closing silently.
 
+# Git workflow (all repos)
+
+- Don't stage or commit unless I ask, or a mode like **full stop** calls for it.
+- Before pushing, rebase onto the latest `main` unless I say otherwise. Then check `git log` and squash any wip or fixup commits into logical ones.
+- Commit messages are one short sentence in conventional-commit form (`feat(scope): ...`), unless the repo sets its own style.
+- Outside SAUCE-2 repos, don't open a PR unless I ask.
+
+# Tests
+
+- Prefer tests that run real code over mocks. When logic can only be tested through mocks, say so and suggest how to split it out.
+- While working, run only the tests for what you're changing. Run the full suite before filing a PR.
+
+# Project rules files (AGENTS.md / CLAUDE.md)
+
+- When a project needs a rules file, write `AGENTS.md` and make `CLAUDE.md` the single line `@AGENTS.md`, so every agent reads the same rules.
+- Include only what an agent needs at the start of every session: style rules with a short good/bad example, how to run one test and the full suite, where the database schema lives, a high-level directory overview, and project scripts the agent should use.
+- Leave out what the README already says (link to it instead), what the model already knows, secrets, and repeated rules. A stale directory overview is worse than none, so keep it brief.
+- When I correct a pattern you wrote, add it to the style section of that project's `AGENTS.md` with a one-line reason and an example, and tell me you did.
+
 # Machines and Tailscale
 
 - Tailnet devices: `macbook` (macOS), `steampc` (SteamOS), `desktop` (Windows), `desktop-wsl` (WSL in `desktop`), `iphone`.
